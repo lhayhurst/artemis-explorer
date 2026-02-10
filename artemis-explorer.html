@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Artemis Preset Explorer</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#000;--surface:#0a0a0a;--surface-2:#111;--surface-3:#181818;
+  --border:#1e1e1e;--border-hi:#333;
+  --text:#fff;--text-dim:#999;--text-muted:#555;
+  --accent:#fff;--accent-dim:rgba(255,255,255,0.06);
+  --green:#4ade80;--cyan:#67e8f9;--purple:#c4b5fd;--pink:#f9a8d4;--orange:#fdba74;--amber:#facc15;
+  --c-vco:#fff;--c-vcf:#f9a8d4;--c-env:#4ade80;--c-lfo:#facc15;
+  --c-fx:#c4b5fd;--c-seq:#67e8f9;--c-mod:#fdba74;--c-global:#999;
+  --sidebar-w:260px;--header-h:56px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border-hi);border-radius:3px}
+.header{height:var(--header-h);background:var(--bg);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:16px;flex-shrink:0;z-index:100}
+.logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.logo svg{height:22px;width:auto}
+.logo-sub{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:400;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted)}
+.bank-tabs{display:flex;gap:2px;margin-left:20px}
+.bank-tab{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;padding:6px 14px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--text-muted);cursor:pointer;transition:all .15s;position:relative}
+.bank-tab:hover{color:var(--text-dim);border-color:var(--border-hi)}
+.bank-tab.active{background:var(--accent-dim);color:var(--text);border-color:var(--text-muted)}
+.bank-tab.loaded::after{content:'';position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:4px;height:4px;background:var(--green);border-radius:50%}
+.bank-tab.factory::after{background:var(--cyan)}
+.bank-tab .src-badge{font-size:7px;position:absolute;top:-2px;right:-2px;padding:1px 3px;border-radius:2px;letter-spacing:.3px;line-height:1;font-weight:600}
+.bank-tab .src-badge.factory{background:rgba(103,232,249,.15);color:var(--cyan)}
+.bank-tab .src-badge.user{background:rgba(74,222,128,.15);color:var(--green)}
+.header-spacer{flex:1}
+.view-tabs{display:flex;gap:2px}
+.view-tab{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:500;letter-spacing:1px;padding:7px 14px;background:transparent;border:1px solid transparent;border-radius:4px;color:var(--text-muted);cursor:pointer;transition:all .15s;text-transform:uppercase}
+.view-tab:hover{color:var(--text-dim)}
+.view-tab.active{color:var(--text);border-color:var(--border-hi)}
+.hdr-btn{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:500;padding:7px 14px;border:1px solid var(--border);border-radius:4px;cursor:pointer;letter-spacing:.5px;text-transform:uppercase;transition:all .15s;background:transparent;color:var(--text-muted)}
+.hdr-btn:hover{border-color:var(--text-muted);color:var(--text)}
+.hdr-btn.factory-btn{color:var(--cyan);border-color:rgba(103,232,249,.3)}
+.hdr-btn.factory-btn:hover{border-color:var(--cyan)}
+.credit{font-size:10px;color:var(--text-muted);text-decoration:none;transition:color .15s;border-left:1px solid var(--border);padding-left:14px;margin-left:4px;white-space:nowrap}
+.credit:hover{color:var(--text-dim)}
+.main{display:flex;flex:1;overflow:hidden}
+.sidebar{width:var(--sidebar-w);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+.sidebar-header{padding:10px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border)}
+.sidebar-search{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:6px 10px;color:var(--text);font-size:12px;font-family:'Outfit',sans-serif;outline:none}
+.sidebar-search:focus{border-color:var(--text-muted)}
+.sidebar-search::placeholder{color:var(--text-muted)}
+.preset-list{flex:1;overflow-y:auto;padding:2px 0}
+.preset-item{display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;transition:background .1s;border-left:2px solid transparent}
+.preset-item:hover{background:var(--surface-2)}
+.preset-item.active{background:var(--accent-dim);border-left-color:var(--text)}
+.preset-item.compare-selected{border-left-color:var(--orange)}
+.preset-num{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);min-width:26px}
+.preset-item.active .preset-num{color:var(--text)}
+.preset-label{font-size:12px;color:var(--text-dim);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:400}
+.preset-item.active .preset-label{color:var(--text);font-weight:500}
+.preset-mode-badge{font-family:'JetBrains Mono',monospace;font-size:8px;padding:2px 5px;background:var(--surface-3);border-radius:3px;color:var(--text-muted);letter-spacing:.5px;text-transform:uppercase;border:1px solid var(--border)}
+.preset-mini-bars{display:flex;gap:1px;align-items:flex-end;height:14px}
+.preset-mini-bar{width:3px;border-radius:1px}
+.content-area{flex:1;overflow-y:auto;padding:24px 28px}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-muted);text-align:center;gap:16px}
+.empty-state svg{opacity:.15}
+.empty-state h3{font-size:15px;font-weight:500;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase}
+.empty-state p{font-size:13px;max-width:420px;line-height:1.7}
+.detail-header{margin-bottom:24px}
+.detail-title{font-size:20px;font-weight:600;letter-spacing:1px}
+.detail-subtitle{font-size:13px;color:var(--text-muted);margin-top:4px;font-weight:300}
+.detail-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:10px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.card-head{display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;user-select:none}
+.card-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.card-title{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:9px;letter-spacing:2px;text-transform:uppercase;flex:1;color:var(--text-dim)}
+.card-count{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted)}
+.card-chevron{font-size:10px;color:var(--text-muted);transition:transform .2s}
+.card-head.open .card-chevron{transform:rotate(90deg)}
+.card-body{display:none;padding:2px 0 6px}
+.card-body.open{display:block}
+.pr{display:flex;align-items:center;padding:4px 14px;gap:10px;transition:background .08s}
+.pr:hover{background:var(--surface-2)}
+.pr-n{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);min-width:140px;flex-shrink:0}
+.pr-bar{flex:1;height:4px;background:var(--surface-3);border-radius:2px;overflow:hidden;min-width:60px}
+.pr-fill{height:100%;border-radius:2px}
+.pr-v{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:500;min-width:70px;text-align:right}
+.pr-v.str{color:var(--cyan)}.pr-v.on{color:var(--green)}.pr-v.off,.pr-v.zero{color:var(--text-muted)}
+.mod-section{margin-top:24px}
+.mod-title{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10px;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;color:var(--text-dim)}
+.mod-tabs{display:flex;gap:2px;margin-bottom:10px}
+.mod-tab{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:500;padding:5px 10px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--text-muted);cursor:pointer;transition:all .12s;text-transform:uppercase;letter-spacing:.5px}
+.mod-tab:hover{color:var(--text-dim)}
+.mod-tab.active{color:var(--orange);border-color:rgba(253,186,116,.4)}
+.mod-tab .dot{display:inline-block;width:4px;height:4px;background:var(--orange);border-radius:50%;margin-left:4px;vertical-align:middle}
+.mod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:2px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:10px}
+.mg-row{display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:3px}
+.mg-row.has{background:rgba(253,186,116,.04)}
+.mg-n{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);min-width:130px}
+.mg-row.has .mg-n{color:var(--text-dim)}
+.mg-v{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:500;color:var(--text-muted)}
+.mg-row.has .mg-v{color:var(--orange)}
+.seq-grid{display:flex;flex-wrap:wrap;gap:3px;padding:8px 14px}
+.sq{font-family:'JetBrains Mono',monospace;font-size:8px;width:46px;padding:4px 2px;text-align:center;background:var(--surface-2);border:1px solid var(--border);border-radius:3px;color:var(--text-muted)}
+.sq.on{background:rgba(103,232,249,.05);border-color:rgba(103,232,249,.2);color:var(--cyan)}
+.sq.tie{border-color:var(--green)}
+.sq-n{font-weight:600}
+.table-wrap{overflow:auto;max-height:100%}
+table.data{width:100%;border-collapse:collapse;font-size:11px}
+table.data th{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:500;letter-spacing:.5px;text-transform:uppercase;padding:8px 10px;background:var(--surface);border-bottom:1px solid var(--border);color:var(--text-muted);text-align:left;position:sticky;top:0;z-index:10;cursor:pointer;white-space:nowrap;user-select:none}
+table.data th:hover{color:var(--text)}
+table.data th.sorted{color:var(--text)}
+table.data td{padding:6px 10px;border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:10px;white-space:nowrap;color:var(--text-dim)}
+table.data tr{transition:background .08s;cursor:pointer}
+table.data tr:hover{background:var(--surface-2)}
+table.data tr.active{background:var(--accent-dim)}
+table.data tr.active td{color:var(--text)}
+.td-bar{display:inline-block;height:3px;border-radius:2px;vertical-align:middle;margin-left:4px}
+.filter-row{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
+.filter-chip{font-family:'JetBrains Mono',monospace;font-size:9px;padding:5px 12px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--text-muted);cursor:pointer;transition:all .12s;text-transform:uppercase;letter-spacing:.5px}
+.filter-chip:hover{border-color:var(--border-hi);color:var(--text-dim)}
+.filter-chip.active{color:var(--text);border-color:var(--text-muted)}
+.compare-grid{display:grid;gap:10px}
+.compare-col-head{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:12px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:6px 6px 0 0;position:sticky;top:0;z-index:5;letter-spacing:1px}
+.compare-section-title{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);padding:10px 0 4px}
+.cmp-label{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);min-width:120px}
+.cmp-val{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:500;color:var(--text-dim)}
+.cmp-val.diff{color:var(--orange)}
+#fileInput{display:none}
+@media(max-width:900px){.sidebar{width:200px}.detail-grid{grid-template-columns:1fr}.credit{display:none}}
+</style>
+</head>
+<body>
+<div class="header">
+  <a class="logo" href="https://dreadbox-fx.com/artemis/" target="_blank" rel="noopener" title="Dreadbox Artemis">
+    <svg viewBox="0 0 195 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M0 24L10 2h4l10 22h-4.2l-2.4-5.6H6.6L4.2 24H0zm7.8-9h8.4L12 5.4 7.8 15z" fill="#fff"/>
+      <path d="M28 24V2h11c2.2 0 3.9.6 5.1 1.7 1.2 1.1 1.8 2.6 1.8 4.5 0 1.5-.4 2.7-1.2 3.7-.8 1-1.9 1.6-3.3 2L46 24h-4.6l-4.2-9.6H32V24h-4zm4-13h6.6c1.2 0 2.1-.3 2.8-.9.7-.6 1-1.5 1-2.5s-.3-1.8-1-2.4c-.7-.6-1.6-.9-2.8-.9H32V11z" fill="#fff"/>
+      <path d="M52 24V5.6h-7V2h18v3.6h-7V24h-4z" fill="#fff"/>
+      <path d="M67 24V2h14v3.6H71v5.6h8.8v3.4H71v5.8h10.4V24H67z" fill="#fff"/>
+      <path d="M86 24V2h5.8l5.8 15.6L103.4 2h5.8v22h-3.8V7.4L99.2 24h-3.2L89.8 7.4V24H86z" fill="#fff"/>
+      <path d="M115 24V2h4v22h-4z" fill="#fff"/>
+      <path d="M124 19.8l3.2-2c.8 1.6 1.7 2.7 2.7 3.4 1 .7 2.2 1 3.7 1 1.4 0 2.5-.4 3.3-1.1.8-.7 1.2-1.6 1.2-2.8 0-1-.4-1.9-1.1-2.5-.7-.6-2.2-1.3-4.4-2.1-2.4-.9-4.1-1.9-5-3-.9-1.1-1.4-2.5-1.4-4 0-2 .7-3.6 2.2-4.8 1.4-1.3 3.2-1.9 5.4-1.9 1.8 0 3.3.4 4.6 1.3 1.3.9 2.2 2.1 2.9 3.6l-3.1 1.8c-1-2.2-2.5-3.2-4.5-3.2-1.2 0-2.1.3-2.8.9-.7.6-1 1.4-1 2.4 0 .9.3 1.6 1 2.2.7.6 2 1.2 4 2 2.6 1 4.4 2.1 5.4 3.3 1 1.2 1.5 2.7 1.5 4.4 0 2.2-.8 3.9-2.3 5.2-1.5 1.3-3.5 2-5.9 2-2 0-3.8-.5-5.3-1.5-1.5-1-2.7-2.5-3.3-4.6z" fill="#fff"/>
+      <line x1="152" y1="13" x2="164" y2="13" stroke="#fff" stroke-width="1.5"/>
+      <path d="M161 9l5 4-5 4" stroke="#fff" stroke-width="1.5" fill="none" stroke-linejoin="round"/>
+      <circle cx="176" cy="5" r="1.2" fill="#fff" opacity=".3"/>
+      <circle cx="183" cy="10" r="1" fill="#fff" opacity=".2"/>
+      <circle cx="173" cy="14" r=".8" fill="#fff" opacity=".15"/>
+      <circle cx="180" cy="20" r="1" fill="#fff" opacity=".2"/>
+      <circle cx="188" cy="6" r=".8" fill="#fff" opacity=".15"/>
+      <line x1="176" y1="5" x2="183" y2="10" stroke="#fff" stroke-width=".4" opacity=".15"/>
+      <line x1="183" y1="10" x2="180" y2="20" stroke="#fff" stroke-width=".4" opacity=".15"/>
+      <line x1="173" y1="14" x2="183" y2="10" stroke="#fff" stroke-width=".4" opacity=".15"/>
+    </svg>
+  </a>
+  <div class="logo-sub">Preset Explorer</div>
+  <div class="bank-tabs" id="bankTabs"></div>
+  <div class="header-spacer"></div>
+  <div class="view-tabs">
+    <div class="view-tab active" data-view="detail" onclick="switchView('detail')">Detail</div>
+    <div class="view-tab" data-view="table" onclick="switchView('table')">Table</div>
+    <div class="view-tab" data-view="compare" onclick="switchView('compare')">Compare</div>
+  </div>
+  <button class="hdr-btn" onclick="document.getElementById('fileInput').click()">Load .syx</button>
+  <button class="hdr-btn factory-btn" onclick="loadFactoryBank()">Load Factory</button>
+  <a class="credit" href="https://dreadbox-fx.com/artemis/" target="_blank" rel="noopener">dreadbox-fx.com</a>
+  <input type="file" id="fileInput" accept=".syx,.SYX" multiple onchange="handleFiles(event)">
+</div>
+<div class="main">
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <input class="sidebar-search" id="search" placeholder="Filter presets..." oninput="filterList()">
+    </div>
+    <div class="preset-list" id="presetList"></div>
+  </div>
+  <div class="content-area" id="contentArea"></div>
+</div>
+<script>
+const BANKS={},BANK_SOURCE={};
+let activeBank=null,activePresetIdx=0,currentView='detail',compareSelection=[],sortCol=null,sortDir=1,filterMode=null,activeModTab='mod_wheel';
+const BANK_LETTERS=['A','B','C','D','E','F','G','H'];
+const MODES={Poly:'POLY',Mono:'MONO',Unison:'UNI','_3x2':'TRI','_2x3':'DUO'};
+const SECTIONS=[
+  {id:'vco',t:'VCO — Oscillators',c:'var(--c-vco)',k:['vco_morph','vco_mix','vco_sub_noise','vco_sync','vco_2_tune','vco_detune','vco_glide','vco_pw','vco_fm','vco_fm_eg']},
+  {id:'lpf',t:'VCF — Low Pass',c:'var(--c-vcf)',k:['lpf_cut','lpf_reson','lpf_poles','lpf_track','lpf_cut_eg_amount','lpf_ffm','lpf_ffm_noise_source']},
+  {id:'hpf',t:'VCF — High Pass',c:'var(--c-vcf)',k:['hpf_cut','hpf_reson']},
+  {id:'vca',t:'Env — Amplitude',c:'var(--c-env)',k:['vca_eg_a','vca_eg_d','vca_eg_s','vca_eg_r']},
+  {id:'eg',t:'Env — Filter/FM',c:'var(--c-env)',k:['eg_a','eg_d','eg_s','eg_r']},
+  {id:'lfo1',t:'LFO 1',c:'var(--c-lfo)',k:['lfo_1_rate','lfo_1_fade','lfo_1_wave','lfo_1_vco_target','lfo_1_vco_amount','lfo_1_vcf_amount']},
+  {id:'lfo2',t:'LFO 2',c:'var(--c-lfo)',k:['lfo_2_rate','lfo_2_xmod','lfo_2_wave','lfo_2_sync_mode','lfo_2_morph_amount','lfo_2_vco_1_pw_amount']},
+  {id:'gl',t:'Global',c:'var(--c-global)',k:['play_mode','legato','glide','drive_mode','spread','level','bpm','instability_depth','amp_velocity']},
+];
+const FX=[
+  {id:'distortions',t:'FX — Distortion',c:'var(--c-fx)'},
+  {id:'modulations',t:'FX — Modulation',c:'var(--c-fx)'},
+  {id:'delays',t:'FX — Delay',c:'var(--c-fx)'},
+  {id:'reverbs',t:'FX — Reverb',c:'var(--c-fx)'},
+];
+const ALGO_MAP={Chorus:'chorus',Ensemble:'ensemble',TapeChorus:'tape_chorus',BBDChorus:'bbd_chorus',Flanger:'flanger',BBDFlanger:'bbd_flanger',ThroughZeroFlanger:'through_zero_flanger',Phaser:'phaser',BarberPolePhaser:'barber_pole_phaser',DoubleNotch:'double_notch',PitchShifter:'pitch_shifter',Stereo:'stereo',PingPong:'ping_pong',BBDDelay:'bbd',RandomRepeater:'random_repeater',Small:'small',Large:'large',Huge:'huge',Shimmer:'shimmer',Granular:'granular',Cloud:'granular'};
+const NAMES={vco_morph:'Wave/Morph',vco_mix:'VCO Mix',vco_sub_noise:'Sub/Noise',vco_sync:'Sync',vco_2_tune:'VCO2 Tune',vco_detune:'Detune',vco_glide:'Glide',vco_pw:'Pulse Width',vco_fm:'FM Amount',vco_fm_eg:'FM→Env',lpf_cut:'Cutoff',lpf_reson:'Resonance',lpf_poles:'12dB',lpf_track:'Key Track',lpf_cut_eg_amount:'Env Amount',lpf_ffm:'Filter FM',lpf_ffm_noise_source:'FFM Noise',hpf_cut:'Cutoff',hpf_reson:'Resonance',vca_eg_a:'Attack',vca_eg_d:'Decay',vca_eg_s:'Sustain',vca_eg_r:'Release',eg_a:'Attack',eg_d:'Decay',eg_s:'Sustain',eg_r:'Release',lfo_1_rate:'Rate',lfo_1_fade:'Fade In',lfo_1_wave:'Wave',lfo_1_vco_target:'VCO Target',lfo_1_vco_amount:'VCO Amt',lfo_1_vcf_amount:'VCF Amt',lfo_2_rate:'Rate',lfo_2_xmod:'X-Mod',lfo_2_wave:'Wave',lfo_2_sync_mode:'Sync',lfo_2_morph_amount:'Wave Amt',lfo_2_vco_1_pw_amount:'PW Amt',play_mode:'Play Mode',legato:'Legato',glide:'Glide',drive_mode:'Drive',spread:'Spread',level:'Level',bpm:'BPM',instability_depth:'Instability',amp_velocity:'Amp Vel',typ:'Algorithm',mix:'Mix',gain:'Gain',decimator_frequency:'Rate',decimator_bitcrush:'Bits',depth:'Depth',feedback:'Feedback',speed:'Speed',width:'Width',time:'Time',left_time:'L Time',right_time:'R Time',damping:'Damping',pan:'Pan',mod_frequency:'Mod Freq',mod_depth:'Mod Depth',phase_shift:'Phase',notch:'Notch',pitch_left:'Pitch L',pitch_right:'Pitch R',pre_delay:'Pre-Delay',size:'Size',decay:'Decay',pitch:'Pitch',grains:'Grains',grain_size:'Grain Size',detune:'Detune',length:'Length',envelope:'Envelope',repeats:'Repeats',probability:'Prob',bpm_sync:'BPM Sync'};
+const MOD_SOURCES=['mod_wheel','velocity','aftertouch','cc_74','key_track'];
+const MOD_LABELS={mod_wheel:'Mod Wheel',velocity:'Velocity',aftertouch:'Aftertouch',cc_74:'CC74',key_track:'Key Track'};
+const EMPTY_SVG='<svg width="80" height="80" viewBox="0 0 80 80" fill="none"><path d="M40 8L12 68h56L40 8z" stroke="#fff" stroke-width="1" fill="none"/><circle cx="40" cy="32" r="2" fill="#fff"/><circle cx="30" cy="52" r="1.5" fill="#fff"/><circle cx="50" cy="52" r="1.5" fill="#fff"/><line x1="40" y1="32" x2="30" y2="52" stroke="#fff" stroke-width=".5"/><line x1="40" y1="32" x2="50" y2="52" stroke="#fff" stroke-width=".5"/><line x1="30" y1="52" x2="50" y2="52" stroke="#fff" stroke-width=".5"/></svg>';
+
+function parseSyx(buffer){const b=new Uint8Array(buffer),presets=[];let i=0;while(i<b.length){if(b[i]===0xF0){let end=i+1;while(end<b.length&&b[end]!==0xF7)end++;const payload=b.slice(i+6,end),txt=new TextDecoder().decode(payload);if(txt.startsWith('{'))try{presets.push(JSON.parse(txt))}catch(e){}i=end+1}else i++}return presets}
+
+function handleFiles(e){for(const file of e.target.files)loadFile(file)}
+function loadFile(file){const reader=new FileReader();reader.onload=e=>{const presets=parseSyx(e.target.result);if(!presets.length){alert('No presets found in '+file.name);return}let letter=null;const match=file.name.match(/bank[_\-\s]*([a-hA-H])/i);if(match)letter=match[1].toUpperCase();if(!letter){const m2=file.name.match(/[_\-\s]([a-hA-H])\.(syx|bin)$/i);if(m2)letter=m2[1].toUpperCase()}if(!letter){for(const l of BANK_LETTERS)if(!BANKS[l]){letter=l;break};if(!letter)letter='A'}BANKS[letter]=presets.length===65?presets.slice(1):presets.slice(0,64);BANK_SOURCE[letter]='user';renderBankTabs();switchBank(letter)};reader.readAsArrayBuffer(file)}
+
+document.addEventListener('dragover',e=>e.preventDefault());
+document.addEventListener('drop',e=>{e.preventDefault();for(const file of e.dataTransfer.files)loadFile(file)});
+
+function renderBankTabs(){document.getElementById('bankTabs').innerHTML=BANK_LETTERS.map(l=>{const loaded=!!BANKS[l],src=BANK_SOURCE[l],badge=src?`<span class="src-badge ${src}">${src==='factory'?'F':'U'}</span>`:'';return`<div class="bank-tab ${l===activeBank?'active':''} ${loaded?'loaded':''} ${src||''}" onclick="switchBank('${l}')">${l}${badge}</div>`}).join('')}
+
+function switchBank(letter){activeBank=letter;activePresetIdx=0;compareSelection=[];filterMode=null;sortCol=null;sortDir=1;renderBankTabs();renderSidebar();renderView()}
+
+async function autoLoadBanks(){for(let i=0;i<BANK_LETTERS.length;i++){const letter=BANK_LETTERS[i],filename=`artemis-bank-${letter.toLowerCase()}.bin`;try{const resp=await fetch(filename);if(!resp.ok)continue;const buffer=await resp.arrayBuffer(),presets=parseSyx(buffer);if(!presets.length)continue;BANKS[letter]=presets.length===65?presets.slice(1):presets.slice(0,64);BANK_SOURCE[letter]='factory';renderBankTabs()}catch(e){}}}
+
+async function loadFactoryBank(){if(!activeBank)return;const filename=`artemis-bank-${activeBank.toLowerCase()}.bin`;try{const resp=await fetch(filename);if(!resp.ok){alert('Factory file not found: '+filename);return}const buffer=await resp.arrayBuffer(),presets=parseSyx(buffer);if(!presets.length){alert('No presets found in '+filename);return}BANKS[activeBank]=presets.length===65?presets.slice(1):presets.slice(0,64);BANK_SOURCE[activeBank]='factory';renderBankTabs();renderSidebar();renderView()}catch(e){alert('Could not load factory file: '+filename)}}
+function renderSidebar(){const list=document.getElementById('presetList');if(!activeBank||!BANKS[activeBank]){list.innerHTML='';return}const presets=BANKS[activeBank],query=document.getElementById('search').value.toLowerCase();list.innerHTML=presets.map((p,i)=>{const b=p.base||{},name=p.name||`${activeBank}${String(i+1).padStart(2,'0')}`,mode=MODES[b.play_mode]||b.play_mode||'?';if(query&&!name.toLowerCase().includes(query)&&!mode.toLowerCase().includes(query))return'';const isActive=i===activePresetIdx,isCompare=compareSelection.includes(i);const bars=[b.lpf_cut||0,b.lpf_reson||0,b.vca_eg_a||0,b.vca_eg_r||0];const miniHtml='<div class="preset-mini-bars">'+bars.map(v=>'<div class="preset-mini-bar" style="height:'+Math.max(2,v*14)+'px;background:'+(v>0.5?'#fff':'#333')+'"></div>').join('')+'</div>';return'<div class="preset-item '+(isActive?'active':'')+' '+(isCompare?'compare-selected':'')+'" onclick="selectPreset('+i+')" oncontextmenu="toggleCompare(event,'+i+')"><div class="preset-num">'+String(i+1).padStart(2,'0')+'</div><div class="preset-label">'+name+'</div>'+miniHtml+'<div class="preset-mode-badge">'+mode+'</div></div>'}).join('')}
+
+function filterList(){renderSidebar()}
+function selectPreset(i){activePresetIdx=i;renderSidebar();if(currentView==='detail')renderDetail();else if(currentView==='table')document.querySelectorAll('table.data tr').forEach((tr,idx)=>{if(idx>0)tr.classList.toggle('active',idx-1===i)})}
+function toggleCompare(e,i){e.preventDefault();const idx=compareSelection.indexOf(i);if(idx>=0)compareSelection.splice(idx,1);else if(compareSelection.length<3)compareSelection.push(i);renderSidebar();if(currentView==='compare')renderCompare()}
+
+function switchView(v){currentView=v;document.querySelectorAll('.view-tab').forEach(t=>t.classList.toggle('active',t.dataset.view===v));renderView()}
+
+function renderView(){const area=document.getElementById('contentArea');if(!activeBank||!BANKS[activeBank]){area.innerHTML='<div class="empty-state">'+EMPTY_SVG+'<h3>No bank loaded</h3><p>Click "Load .syx" to import your own bank, "Load Factory" to fetch the factory default for Bank '+(activeBank||'?')+', or drag and drop a .syx file onto this window.</p></div>';return}if(currentView==='detail')renderDetail();else if(currentView==='table')renderTable();else if(currentView==='compare')renderCompare()}
+
+function fmt(v){if(typeof v==='boolean')return v?'ON':'OFF';if(typeof v==='string')return v;if(typeof v==='number'){if(Number.isInteger(v))return String(v);return(v*100).toFixed(1)+'%'}return String(v)}
+function isZero(v){return(typeof v==='number'&&Math.abs(v)<0.001)||v===false||v==='Off'}
+function pct(v){return typeof v==='number'?Math.min(Math.abs(v)*100,100):0}
+function midiNote(n){const ns=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];return ns[n%12]+(Math.floor(n/12)-1)}
+
+function paramRow(key,val,color){const n=NAMES[key]||key.replace(/_/g,' '),f=fmt(val),isNum=typeof val==='number',cls=typeof val==='string'?'str':(val===true?'on':(isZero(val)?'zero':''));const bar=isNum?'<div class="pr-bar"><div class="pr-fill" style="width:'+pct(val)+'%;background:'+color+'"></div></div>':'';return'<div class="pr"><div class="pr-n">'+n+'</div>'+bar+'<div class="pr-v '+cls+'">'+f+'</div></div>'}
+
+function renderDetail(){const area=document.getElementById('contentArea'),p=BANKS[activeBank][activePresetIdx];if(!p)return;const b=p.base||{},name=p.name||`${activeBank}${String(activePresetIdx+1).padStart(2,'0')}`,mode=MODES[b.play_mode]||b.play_mode||'';
+let html='<div class="detail-header"><div class="detail-title">'+name+'</div><div class="detail-subtitle">'+mode+' · BPM '+(b.bpm||120).toFixed(0)+' · Drive: '+(b.drive_mode||'Off')+' · Right-click presets in sidebar to compare</div></div><div class="detail-grid">';
+for(const s of SECTIONS){let rows='';for(const k of s.k)if(b[k]!==undefined)rows+=paramRow(k,b[k],s.c);const cnt=s.k.filter(k=>b[k]!==undefined).length;html+='<div class="card"><div class="card-head open" onclick="this.classList.toggle(\'open\');this.nextElementSibling.classList.toggle(\'open\')"><div class="card-dot" style="background:'+s.c+'"></div><div class="card-title">'+s.t+'</div><div class="card-count">'+cnt+'</div><div class="card-chevron">▶</div></div><div class="card-body open">'+rows+'</div></div>'}
+for(const fx of FX){const d=b[fx.id];if(!d)continue;let rows=paramRow('typ',d.typ,fx.c)+paramRow('mix',d.mix,fx.c);for(const[k,v]of Object.entries(d)){if(['typ','mix'].includes(k)||typeof v==='object')continue;rows+=paramRow(k,v,fx.c)}const algoKey=ALGO_MAP[d.typ];if(algoKey&&d[algoKey])for(const[k,v]of Object.entries(d[algoKey]))rows+=paramRow(k,v,fx.c);html+='<div class="card"><div class="card-head open" onclick="this.classList.toggle(\'open\');this.nextElementSibling.classList.toggle(\'open\')"><div class="card-dot" style="background:'+fx.c+'"></div><div class="card-title">'+fx.t+'</div><div class="card-chevron">▶</div></div><div class="card-body open">'+rows+'</div></div>'}
+if(b.seq){const seq=b.seq;let rows=paramRow('typ',seq.typ,'var(--c-seq)');if(seq.arpeggiator)for(const[k,v]of Object.entries(seq.arpeggiator))rows+=paramRow(k,v,'var(--c-seq)');if(seq.sequencer){const s=seq.sequencer;rows+=paramRow('length',s.length,'var(--c-seq)');rows+=paramRow('divisions',s.divisions,'var(--c-seq)');rows+=paramRow('gate',s.gate,'var(--c-seq)');if(s.steps){let sg='<div class="seq-grid">';const len=s.length||64;s.steps.slice(0,len).forEach((st,i)=>{const on=st.notes&&st.notes.length>0,notes=on?st.notes.map(n=>midiNote(n.note)).join(' '):'—';sg+='<div class="sq '+(on?'on':'')+' '+(st.tied?'tie':'')+'"><div class="sq-n">'+(i+1)+'</div>'+notes+(st.tied?' TIE':'')+'</div>'});sg+='</div>';rows+=sg}}html+='<div class="card"><div class="card-head open" onclick="this.classList.toggle(\'open\');this.nextElementSibling.classList.toggle(\'open\')"><div class="card-dot" style="background:var(--c-seq)"></div><div class="card-title">Seq / Arp</div><div class="card-chevron">▶</div></div><div class="card-body open">'+rows+'</div></div>'}
+html+='</div>';
+html+='<div class="mod-section"><div class="mod-title">Modulation Matrix</div><div class="mod-tabs">';
+for(const src of MOD_SOURCES){if(!p[src])continue;const has=hasModData(p[src]);html+='<div class="mod-tab '+(src===activeModTab?'active':'')+'" onclick="activeModTab=\''+src+'\';renderDetail()">'+MOD_LABELS[src]+(has?'<span class="dot"></span>':'')+'</div>'}
+html+='</div>';if(p[activeModTab])html+=renderModGrid(p[activeModTab]);html+='</div>';area.innerHTML=html}
+
+function hasModData(obj){for(const[k,v]of Object.entries(obj)){if(typeof v==='object'){for(const v2 of Object.values(v))if(typeof v2==='number'&&Math.abs(v2)>0.001)return true}else if(typeof v==='number'&&Math.abs(v)>0.001)return true}return false}
+
+function renderModGrid(mod){let html='<div class="mod-grid">';for(const[k,v]of Object.entries(mod)){if(typeof v==='object'){for(const[k2,v2]of Object.entries(v)){if(typeof v2!=='number')continue;const has=Math.abs(v2)>0.001,f=v2===0?'0':(v2>0?'+':'')+(v2*100).toFixed(1)+'%';html+='<div class="mg-row '+(has?'has':'')+'"><div class="mg-n">'+(k+'.'+k2).replace(/_/g,' ')+'</div><div class="mg-v">'+f+'</div></div>'}}else if(typeof v==='number'){const has=Math.abs(v)>0.001,f=v===0?'0':(v>0?'+':'')+(v*100).toFixed(1)+'%';html+='<div class="mg-row '+(has?'has':'')+'"><div class="mg-n">'+k.replace(/_/g,' ')+'</div><div class="mg-v">'+f+'</div></div>'}}html+='</div>';return html}
+const TABLE_COLS=[
+  {k:'_num',l:'#',fn:(_,i)=>String(i+1).padStart(2,'0')},
+  {k:'_name',l:'Name',fn:(p,i)=>p.name||`${activeBank}${String(i+1).padStart(2,'0')}`},
+  {k:'play_mode',l:'Mode',fn:p=>(MODES[(p.base||{}).play_mode]||(p.base||{}).play_mode||'')},
+  {k:'vco_morph',l:'Wave',fn:p=>(p.base||{}).vco_morph,num:true},
+  {k:'vco_pw',l:'PW',fn:p=>(p.base||{}).vco_pw,num:true},
+  {k:'lpf_cut',l:'Cut',fn:p=>(p.base||{}).lpf_cut,num:true},
+  {k:'lpf_reson',l:'Res',fn:p=>(p.base||{}).lpf_reson,num:true},
+  {k:'lpf_cut_eg_amount',l:'Env→Cut',fn:p=>(p.base||{}).lpf_cut_eg_amount,num:true},
+  {k:'vca_eg_a',l:'VCA A',fn:p=>(p.base||{}).vca_eg_a,num:true},
+  {k:'vca_eg_d',l:'VCA D',fn:p=>(p.base||{}).vca_eg_d,num:true},
+  {k:'vca_eg_s',l:'VCA S',fn:p=>(p.base||{}).vca_eg_s,num:true},
+  {k:'vca_eg_r',l:'VCA R',fn:p=>(p.base||{}).vca_eg_r,num:true},
+  {k:'dist_t',l:'Dist',fn:p=>((p.base||{}).distortions||{}).typ||'—'},
+  {k:'dist_m',l:'D.Mix',fn:p=>((p.base||{}).distortions||{}).mix,num:true},
+  {k:'mod_t',l:'Mod',fn:p=>((p.base||{}).modulations||{}).typ||'—'},
+  {k:'mod_m',l:'M.Mix',fn:p=>((p.base||{}).modulations||{}).mix,num:true},
+  {k:'del_t',l:'Delay',fn:p=>((p.base||{}).delays||{}).typ||'—'},
+  {k:'del_m',l:'Dl.Mix',fn:p=>((p.base||{}).delays||{}).mix,num:true},
+  {k:'rev_t',l:'Reverb',fn:p=>((p.base||{}).reverbs||{}).typ||'—'},
+  {k:'rev_m',l:'R.Mix',fn:p=>((p.base||{}).reverbs||{}).mix,num:true},
+];
+
+function renderTable(){const area=document.getElementById('contentArea'),presets=BANKS[activeBank],modes=[...new Set(presets.map(p=>(p.base||{}).play_mode).filter(Boolean))];let html='<div class="filter-row"><div class="filter-chip '+(!filterMode?'active':'')+'" onclick="filterMode=null;renderTable()">ALL</div>';for(const m of modes)html+='<div class="filter-chip '+(filterMode===m?'active':'')+'" onclick="filterMode=\''+m+'\';renderTable()">'+(MODES[m]||m)+'</div>';html+='</div>';let filtered=presets.map((p,i)=>({p,i}));if(filterMode)filtered=filtered.filter(({p})=>(p.base||{}).play_mode===filterMode);if(sortCol!==null){const col=TABLE_COLS[sortCol];filtered.sort((a,b)=>{let va=col.fn(a.p,a.i),vb=col.fn(b.p,b.i);if(col.num){va=va||0;vb=vb||0;return(va-vb)*sortDir}return String(va||'').localeCompare(String(vb||''))*sortDir})}html+='<div class="table-wrap"><table class="data"><thead><tr>';TABLE_COLS.forEach((c,ci)=>{html+='<th class="'+(sortCol===ci?'sorted':'')+'" onclick="sortTable('+ci+')">'+c.l+(sortCol===ci?(sortDir>0?' ↑':' ↓'):'')+'</th>'});html+='</tr></thead><tbody>';for(const{p,i}of filtered){html+='<tr class="'+(i===activePresetIdx?'active':'')+'" onclick="selectPreset('+i+')">';for(const col of TABLE_COLS){const v=col.fn(p,i);if(col.num&&typeof v==='number'){const p100=(v*100).toFixed(0);html+='<td>'+p100+'%<div class="td-bar" style="width:'+Math.min(v*40,40)+'px;background:#fff"></div></td>'}else html+='<td>'+(v??'—')+'</td>'}html+='</tr>'}html+='</tbody></table></div>';area.innerHTML=html}
+
+function sortTable(ci){if(sortCol===ci)sortDir*=-1;else{sortCol=ci;sortDir=1}renderTable()}
+
+function renderCompare(){const area=document.getElementById('contentArea');if(compareSelection.length<2){area.innerHTML='<div class="empty-state">'+EMPTY_SVG+'<h3>Compare Presets</h3><p>Right-click 2 or 3 presets in the sidebar to select them for comparison. Differences will be highlighted.</p></div>';return}const ps=compareSelection.map(i=>({idx:i,p:BANKS[activeBank][i]})),cols=ps.length;let html='<div class="compare-grid" style="grid-template-columns:160px repeat('+cols+',1fr)"><div></div>';for(const{idx,p}of ps){const name=p.name||`${activeBank}${String(idx+1).padStart(2,'0')}`;html+='<div class="compare-col-head">'+name+'</div>'}for(const s of SECTIONS){html+='<div class="compare-section-title" style="grid-column:1/-1">'+s.t+'</div>';for(const k of s.k){const vals=ps.map(({p})=>(p.base||{})[k]),allSame=vals.every(v=>fmt(v)===fmt(vals[0]));html+='<div class="cmp-label">'+(NAMES[k]||k)+'</div>';for(const v of vals)html+='<div class="cmp-val '+(!allSame?'diff':'')+'">'+fmt(v)+'</div>'}}for(const fx of FX){html+='<div class="compare-section-title" style="grid-column:1/-1">'+fx.t+'</div>';const types=ps.map(({p})=>((p.base||{})[fx.id]||{}).typ||'—'),typeSame=types.every(t=>t===types[0]);html+='<div class="cmp-label">Algorithm</div>';for(const t of types)html+='<div class="cmp-val '+(!typeSame?'diff':'')+'">'+t+'</div>';const mixes=ps.map(({p})=>((p.base||{})[fx.id]||{}).mix||0),mixSame=mixes.every(m=>fmt(m)===fmt(mixes[0]));html+='<div class="cmp-label">Mix</div>';for(const m of mixes)html+='<div class="cmp-val '+(!mixSame?'diff':'')+'">'+fmt(m)+'</div>'}html+='</div>';area.innerHTML=html}
+
+renderBankTabs();switchBank('A');autoLoadBanks();
+</script>
+</body>
+</html>
