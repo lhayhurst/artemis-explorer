@@ -3,7 +3,7 @@ import { classifyPreset, presetDisplayName } from './classifier';
 import { buildSyx } from './sysex-builder';
 import {
   initMidi, initMidiCallbacks, toggleListen, clearMidiBuffer,
-  populateMidiPorts, isListening,
+  populateMidiPorts, isListening, selectOutputPort, sendPreset, sendBank,
 } from './midi';
 import type { ArtemisPreset, BankLetter, BankSource, ViewName, ModSource } from './types';
 // JSZip is loaded from CDN via index.html script tag
@@ -555,9 +555,31 @@ function closeMidiPanel(): void {
   document.getElementById('midiPanel')?.classList.remove('open');
 }
 
+function toggleHelpModal(): void {
+  document.getElementById('helpOverlay')?.classList.toggle('open');
+}
+
+function closeHelpModal(): void {
+  document.getElementById('helpOverlay')?.classList.remove('open');
+}
+
 function setModTab(src: ModSource): void {
   activeModTab = src;
   renderDetail();
+}
+
+// ---------------------------------------------------------------------------
+// Send to Artemis
+// ---------------------------------------------------------------------------
+async function sendCurrentPreset(): Promise<void> {
+  const p = activeBank ? BANKS[activeBank]?.[activePresetIdx] : undefined;
+  if (!p) { document.getElementById('midiStatus')!.textContent = 'No preset selected.'; return; }
+  await sendPreset(p);
+}
+
+async function sendCurrentBank(): Promise<void> {
+  if (!activeBank || !BANKS[activeBank]) { document.getElementById('midiStatus')!.textContent = 'No bank loaded.'; return; }
+  await sendBank(activeBank, BANKS[activeBank]!);
 }
 
 // ---------------------------------------------------------------------------
@@ -567,8 +589,9 @@ declare global { interface Window { [key: string]: unknown } }
 Object.assign(window, {
   switchBank, switchView, selectPreset, toggleCompare, filterList,
   sortTable, setFilter,
-  toggleMidiPanel, closeMidiPanel,
+  toggleMidiPanel, closeMidiPanel, toggleHelpModal, closeHelpModal,
   toggleListen, clearMidiBuffer,
+  selectOutputPort, sendCurrentPreset, sendCurrentBank,
   loadFactoryBank, downloadAll, handleFiles,
   setModTab,
 });

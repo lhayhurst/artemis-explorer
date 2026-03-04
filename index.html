@@ -60,6 +60,21 @@ body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;heig
 .midi-bar button.listen-btn.active{background:var(--green);color:var(--bg);border-color:var(--green)}
 .credit{font-size:10px;color:var(--text-muted);text-decoration:none;transition:color .15s;border-left:1px solid var(--border);padding-left:14px;margin-left:4px;white-space:nowrap}
 .credit:hover{color:var(--text-dim)}
+.help-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;overflow-y:auto;padding:40px 20px}
+.help-overlay.open{display:block}
+.help-modal{max-width:700px;margin:0 auto;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:36px 40px;position:relative}
+.help-modal h2{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:3px;text-transform:uppercase;color:var(--text);margin-bottom:24px}
+.help-modal h3{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);margin:24px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.help-modal p{font-size:13px;color:var(--text-dim);line-height:1.75;margin-bottom:10px}
+.help-modal ul{font-size:13px;color:var(--text-dim);line-height:1.75;margin:0 0 10px 18px}
+.help-modal li{margin-bottom:3px}
+.help-modal table{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:12px}
+.help-modal td,.help-modal th{padding:6px 10px;border:1px solid var(--border);color:var(--text-dim);vertical-align:top}
+.help-modal th{font-family:'JetBrains Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);background:var(--surface-2)}
+.help-modal code{font-family:'JetBrains Mono',monospace;font-size:11px;background:var(--surface-3);padding:1px 5px;border-radius:3px;color:var(--cyan)}
+.help-modal .help-note{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);border-left:2px solid var(--border-hi);padding-left:10px;margin:8px 0}
+.help-close{position:absolute;top:16px;right:16px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;font-size:9px;padding:5px 12px;cursor:pointer;letter-spacing:.5px;text-transform:uppercase;transition:all .15s}
+.help-close:hover{border-color:var(--text-muted);color:var(--text)}
 .main{display:flex;flex:1;overflow:hidden}
 .sidebar{width:var(--sidebar-w);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
 .sidebar-header{padding:10px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border)}
@@ -184,20 +199,91 @@ table.data tr.active td{color:var(--text)}
   <button class="hdr-btn factory-btn" onclick="loadFactoryBank()">Load Factory</button>
   <button class="hdr-btn" onclick="downloadAll()">Download All</button>
   <button class="hdr-btn midi-btn" id="midiBtn" onclick="toggleMidiPanel()">MIDI</button>
+  <button class="hdr-btn" onclick="toggleHelpModal()" title="User Guide">?</button>
   <a class="credit" href="https://dreadbox-fx.com/artemis/" target="_blank" rel="noopener">dreadbox-fx.com</a>
   <input type="file" id="fileInput" accept=".syx,.SYX" multiple onchange="handleFiles(event)">
 </div>
 
 <div class="midi-panel" id="midiPanel">
   <h4>MIDI Connection</h4>
+  <div style="font-size:9px;font-family:'JetBrains Mono',monospace;letter-spacing:1px;color:var(--text-muted);margin-bottom:4px">INPUT</div>
   <select class="midi-select" id="midiPortSelect"><option value="">— Select MIDI Input —</option></select>
   <div class="midi-bar">
     <button class="listen-btn" id="listenBtn" onclick="toggleListen()">Start Listening</button>
     <button onclick="clearMidiBuffer()">Clear Buffer</button>
-    <button onclick="closeMidiPanel()">Close</button>
   </div>
-  <div class="midi-status" id="midiStatus">Not connected. Select a MIDI input port above.</div>
+  <div style="font-size:9px;font-family:'JetBrains Mono',monospace;letter-spacing:1px;color:var(--text-muted);margin-top:12px;margin-bottom:4px">OUTPUT</div>
+  <select class="midi-select" id="midiOutputSelect" onchange="selectOutputPort(this.value)"><option value="">— Select MIDI Output —</option></select>
+  <div class="midi-bar">
+    <button onclick="sendCurrentPreset()">Send Preset</button>
+    <button onclick="sendCurrentBank()">Send Bank</button>
+  </div>
+  <div class="midi-status" id="midiStatus">Not connected. Select MIDI ports above.</div>
+  <div class="midi-bar" style="margin-top:12px"><button onclick="closeMidiPanel()">Close</button></div>
 </div>
+<div class="help-overlay" id="helpOverlay" onclick="if(event.target===this)closeHelpModal()">
+<div class="help-modal">
+  <button class="help-close" onclick="closeHelpModal()">Close</button>
+  <h2>Artemis Preset Explorer — Guide</h2>
+
+  <h3>Bank Tabs</h3>
+  <p>Eight bank tabs (A–H) run across the top. Click any tab to switch to it.</p>
+  <table><tr><th>Indicator</th><th>Meaning</th></tr>
+    <tr><td>Green dot</td><td>Bank is loaded</td></tr>
+    <tr><td>Cyan <strong>F</strong> badge</td><td>Factory preset bank</td></tr>
+    <tr><td>Green <strong>U</strong> badge</td><td>User-loaded bank</td></tr>
+  </table>
+
+  <h3>Loading Presets</h3>
+  <ul>
+    <li><strong>Load .syx</strong> — click the button or drag &amp; drop one or more <code>.syx</code> files onto the window. Files named with a bank letter (e.g. <code>bank-b.syx</code>) land in that bank; others go into the first empty slot.</li>
+    <li><strong>Load Factory</strong> — fetches the Dreadbox factory bank for whichever tab is active.</li>
+    <li><strong>MIDI receive</strong> — see the MIDI section below.</li>
+  </ul>
+
+  <h3>Preset Sidebar</h3>
+  <ul>
+    <li><strong>Filter box</strong> — type to filter by name or play mode.</li>
+    <li><strong>Left-click</strong> a preset to select it and open its detail view.</li>
+    <li><strong>Right-click</strong> a preset to add it to the compare selection (up to 3).</li>
+    <li>Mini bars show cutoff, resonance, attack, and release at a glance.</li>
+  </ul>
+
+  <h3>Detail View</h3>
+  <p>Shows all parameters for the selected preset in collapsible cards: VCO, VCF (LP/HP), Envelopes, LFOs, FX (Distortion, Modulation, Delay, Reverb), Seq/Arp, and Global. Click a card header to collapse or expand it.</p>
+  <p><strong>Modulation Matrix</strong> — tabs below the cards show per-source routing (Mod Wheel, Velocity, Aftertouch, CC74, Key Track). An orange dot means that source has active routing.</p>
+
+  <h3>Table View</h3>
+  <p>All 64 presets in a sortable table. Click a column header to sort; click again to reverse. Use the mode filter chips to narrow the list.</p>
+
+  <h3>Compare View</h3>
+  <p>Right-click 2 or 3 presets in the sidebar, then switch to Compare. Parameters that differ between presets are highlighted in orange.</p>
+
+  <h3>MIDI — Receive from Artemis</h3>
+  <p class="help-note">Requires Chrome or Edge with SysEx access granted.</p>
+  <ol style="font-size:13px;color:var(--text-dim);line-height:1.75;margin:0 0 10px 18px">
+    <li>Open the MIDI panel and select your Artemis from the <strong>INPUT</strong> dropdown.</li>
+    <li>Click <strong>Start Listening</strong>.</li>
+    <li>Trigger a preset or bank export from the Artemis front panel.</li>
+    <li>The app loads the data automatically after a brief pause.</li>
+  </ol>
+  <p><strong>Single preset</strong> — loads into the currently selected bank slot (shown in the status line). The slot flashes green when received.</p>
+  <p><strong>Bank dump</strong> — all 64 presets load into the identified bank, or the first free bank if unidentified.</p>
+
+  <h3>MIDI — Send to Artemis</h3>
+  <ol style="font-size:13px;color:var(--text-dim);line-height:1.75;margin:0 0 10px 18px">
+    <li>Select your Artemis from the <strong>OUTPUT</strong> dropdown in the MIDI panel.</li>
+    <li>Select the preset or bank you want to send in the sidebar.</li>
+    <li>Click <strong>Send Preset</strong> or <strong>Send Bank</strong>.</li>
+  </ol>
+  <p><strong>Send Preset</strong> — loads the preset into Artemis temp memory for audition. Save from the front panel if you want to keep it.</p>
+  <p><strong>Send Bank</strong> — sends all 64 presets. The Artemis prompts you to choose a destination bank slot.</p>
+
+  <h3>Export</h3>
+  <p><strong>Download All</strong> exports every loaded bank as a <code>.zip</code> containing one <code>.syx</code> file per bank.</p>
+</div>
+</div>
+
 <div class="main">
   <div class="sidebar">
     <div class="sidebar-header">

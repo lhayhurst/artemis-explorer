@@ -1,7 +1,9 @@
 import { parseSyx } from './parser';
+import { buildSyx, buildBankSyx, splitSyxMessages } from './sysex-builder';
 import type { ArtemisPreset, BankLetter } from './types';
 
 const BANK_LETTERS: BankLetter[] = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+const INTER_MESSAGE_DELAY_MS = 10;
 
 // Callbacks set by main.ts
 export interface MidiCallbacks {
@@ -15,6 +17,7 @@ export interface MidiCallbacks {
 
 let midiAccess: MIDIAccess | null = null;
 let midiInput: MIDIInput | null = null;
+let midiOutput: MIDIOutput | null = null;
 let midiListening = false;
 let midiBuffer: Uint8Array[] = [];
 let midiTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -26,6 +29,10 @@ export function initMidiCallbacks(cb: MidiCallbacks): void {
 
 function setStatus(html: string): void {
   callbacks?.onStatus(html);
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 export async function initMidi(): Promise<void> {
@@ -44,26 +51,81 @@ export async function initMidi(): Promise<void> {
 
 export function populateMidiPorts(): void {
   if (!midiAccess) return;
-  const sel = document.getElementById('midiPortSelect') as HTMLSelectElement | null;
-  if (!sel) return;
-  const prev = sel.value;
-  sel.innerHTML = '<option value="">— Select MIDI Input —</option>';
-  // MIDIInputMap only guarantees forEach in TS DOM lib — cast to access as Map
+
+  // Input ports
+  const inSel = document.getElementById('midiPortSelect') as HTMLSelectElement | null;
+  if (inSel) {
+    const prevIn = inSel.value;
+    inSel.innerHTML = '<option value="">— Select MIDI Input —</option>';
+    const inputs = midiAccess.inputs as unknown as Map<string, MIDIInput>;
+    inputs.forEach((port, id) => {
+      const opt = document.createElement('option');
+      opt.value = id;
+      opt.textContent = port.name + (port.manufacturer ? ` (${port.manufacturer})` : '');
+      inSel.appendChild(opt);
+    });
+    const prevInOpt = inSel.querySelector<HTMLOptionElement>(`option[value="${prevIn}"]`);
+    if (prevIn && prevInOpt) inSel.value = prevIn;
+  }
+
+  // Output ports
+  const outSel = document.getElementById('midiOutputSelect') as HTMLSelectElement | null;
+  if (outSel) {
+    const prevOut = outSel.value;
+    outSel.innerHTML = '<option value="">— Select MIDI Output —</option>';
+    const outputs = midiAccess.outputs as unknown as Map<string, MIDIOutput>;
+    outputs.forEach((port, id) => {
+      const opt = document.createElement('option');
+      opt.value = id;
+      opt.textContent = port.name + (port.manufacturer ? ` (${port.manufacturer})` : '');
+      outSel.appendChild(opt);
+    });
+    const prevOutOpt = outSel.querySelector<HTMLOptionElement>(`option[value="${prevOut}"]`);
+    if (prevOut && prevOutOpt) outSel.value = prevOut;
+  }
+
   const inputs = midiAccess.inputs as unknown as Map<string, MIDIInput>;
-  inputs.forEach((port, id) => {
-    const opt = document.createElement('option');
-    opt.value = id;
-    opt.textContent = port.name + (port.manufacturer ? ` (${port.manufacturer})` : '');
-    sel.appendChild(opt);
-  });
-  const prevOpt = sel.querySelector<HTMLOptionElement>(`option[value="${prev}"]`);
-  if (prev && prevOpt) sel.value = prev;
   setStatus(
     inputs.size === 0
       ? 'No MIDI devices found. Connect your Artemis via USB and refresh.'
-      : 'Select your Artemis MIDI input port above.'
+      : 'Select your Artemis MIDI ports above.'
   );
 }
+
+export function selectOutputPort(id: string): void {
+  if (!midiAccess) return;
+  midiOutput = (midiAccess.outputs as unknown as Map<string, MIDIOutput>).get(id) ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Send to Artemis
+// ---------------------------------------------------------------------------
+
+export async function sendPreset(preset: ArtemisPreset): Promise<void> {
+  if (!midiOutput) { setStatus('Select a MIDI output port first.'); return; }
+  const messages = splitSyxMessages(buildSyx([preset]));
+  setStatus(`Sending preset... (${messages.length} messages)`);
+  for (const msg of messages) {
+    midiOutput.send(Array.from(msg));
+    await delay(INTER_MESSAGE_DELAY_MS);
+  }
+  setStatus('Preset sent. Artemis is previewing — save from the front panel if you want to keep it.');
+}
+
+export async function sendBank(bankLetter: BankLetter, presets: ArtemisPreset[]): Promise<void> {
+  if (!midiOutput) { setStatus('Select a MIDI output port first.'); return; }
+  const messages = splitSyxMessages(buildBankSyx(bankLetter, presets));
+  for (let i = 0; i < messages.length; i++) {
+    setStatus(`Sending bank ${bankLetter}... <span class="count">${i + 1}/${messages.length}</span>`);
+    midiOutput.send(Array.from(messages[i]!));
+    await delay(INTER_MESSAGE_DELAY_MS);
+  }
+  setStatus(`Bank ${bankLetter} sent. Artemis will prompt you to choose a destination slot.`);
+}
+
+// ---------------------------------------------------------------------------
+// Receive from Artemis
+// ---------------------------------------------------------------------------
 
 export function toggleListen(): void {
   midiListening ? stopListening() : startListening();
