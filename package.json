@@ -1,0 +1,18 @@
+{
+  "name": "artemis-preset-explorer",
+  "version": "0.1.0",
+  "description": "Preset browser and librarian for the Dreadbox Artemis synthesizer",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "vite": "^6.2.0",
+    "vitest": "^3.0.7"
+  }
+}

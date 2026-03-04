@@ -41,6 +41,23 @@ body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;heig
 .hdr-btn:hover{border-color:var(--text-muted);color:var(--text)}
 .hdr-btn.factory-btn{color:var(--cyan);border-color:rgba(103,232,249,.3)}
 .hdr-btn.factory-btn:hover{border-color:var(--cyan)}
+.hdr-btn.midi-btn{color:var(--green);border-color:rgba(74,222,128,.3)}
+.hdr-btn.midi-btn:hover{border-color:var(--green)}
+.hdr-btn.midi-btn.listening{color:var(--bg);background:var(--green);border-color:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}}
+.midi-panel{display:none;position:fixed;top:var(--header-h);right:20px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:16px;z-index:200;min-width:300px;box-shadow:0 8px 32px rgba(0,0,0,.6)}
+.midi-panel.open{display:block}
+.midi-panel h4{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim);margin-bottom:12px}
+.midi-select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:6px 10px;color:var(--text);font-size:12px;font-family:'Outfit',sans-serif;outline:none;margin-bottom:10px}
+.midi-select:focus{border-color:var(--text-muted)}
+.midi-status{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);margin-top:8px;line-height:1.6}
+.midi-status .count{color:var(--green);font-weight:600}
+.midi-bar{display:flex;gap:6px;margin-top:10px}
+.midi-bar button{font-family:'JetBrains Mono',monospace;font-size:9px;padding:6px 12px;border-radius:4px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;transition:all .15s}
+.midi-bar button:hover{border-color:var(--text-muted);color:var(--text)}
+.midi-bar button.listen-btn{color:var(--green);border-color:rgba(74,222,128,.3)}
+.midi-bar button.listen-btn:hover{border-color:var(--green)}
+.midi-bar button.listen-btn.active{background:var(--green);color:var(--bg);border-color:var(--green)}
 .credit{font-size:10px;color:var(--text-muted);text-decoration:none;transition:color .15s;border-left:1px solid var(--border);padding-left:14px;margin-left:4px;white-space:nowrap}
 .credit:hover{color:var(--text-dim)}
 .main{display:flex;flex:1;overflow:hidden}
@@ -53,6 +70,8 @@ body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;heig
 .preset-item{display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;transition:background .1s;border-left:2px solid transparent}
 .preset-item:hover{background:var(--surface-2)}
 .preset-item.active{background:var(--accent-dim);border-left-color:var(--text)}
+.preset-item.flash{animation:slotflash .8s ease-out}
+@keyframes slotflash{0%{background:var(--green)}50%{background:rgba(74,222,128,.15)}100%{background:var(--accent-dim)}}
 .preset-item.compare-selected{border-left-color:var(--orange)}
 .preset-num{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);min-width:26px}
 .preset-item.active .preset-num{color:var(--text)}
@@ -163,8 +182,21 @@ table.data tr.active td{color:var(--text)}
   </div>
   <button class="hdr-btn" onclick="document.getElementById('fileInput').click()">Load .syx</button>
   <button class="hdr-btn factory-btn" onclick="loadFactoryBank()">Load Factory</button>
+  <button class="hdr-btn" onclick="downloadAll()">Download All</button>
+  <button class="hdr-btn midi-btn" id="midiBtn" onclick="toggleMidiPanel()">MIDI</button>
   <a class="credit" href="https://dreadbox-fx.com/artemis/" target="_blank" rel="noopener">dreadbox-fx.com</a>
   <input type="file" id="fileInput" accept=".syx,.SYX" multiple onchange="handleFiles(event)">
+</div>
+
+<div class="midi-panel" id="midiPanel">
+  <h4>MIDI Connection</h4>
+  <select class="midi-select" id="midiPortSelect"><option value="">— Select MIDI Input —</option></select>
+  <div class="midi-bar">
+    <button class="listen-btn" id="listenBtn" onclick="toggleListen()">Start Listening</button>
+    <button onclick="clearMidiBuffer()">Clear Buffer</button>
+    <button onclick="closeMidiPanel()">Close</button>
+  </div>
+  <div class="midi-status" id="midiStatus">Not connected. Select a MIDI input port above.</div>
 </div>
 <div class="main">
   <div class="sidebar">
@@ -175,6 +207,7 @@ table.data tr.active td{color:var(--text)}
   </div>
   <div class="content-area" id="contentArea"></div>
 </div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
 const BANKS={},BANK_SOURCE={};
 let activeBank=null,activePresetIdx=0,currentView='detail',compareSelection=[],sortCol=null,sortDir=1,filterMode=null,activeModTab='mod_wheel';
@@ -202,6 +235,10 @@ const MOD_SOURCES=['mod_wheel','velocity','aftertouch','cc_74','key_track'];
 const MOD_LABELS={mod_wheel:'Mod Wheel',velocity:'Velocity',aftertouch:'Aftertouch',cc_74:'CC74',key_track:'Key Track'};
 const EMPTY_SVG='<svg width="80" height="80" viewBox="0 0 80 80" fill="none"><path d="M40 8L12 68h56L40 8z" stroke="#fff" stroke-width="1" fill="none"/><circle cx="40" cy="32" r="2" fill="#fff"/><circle cx="30" cy="52" r="1.5" fill="#fff"/><circle cx="50" cy="52" r="1.5" fill="#fff"/><line x1="40" y1="32" x2="30" y2="52" stroke="#fff" stroke-width=".5"/><line x1="40" y1="32" x2="50" y2="52" stroke="#fff" stroke-width=".5"/><line x1="30" y1="52" x2="50" y2="52" stroke="#fff" stroke-width=".5"/></svg>';
 
+function classifyPreset(p){const b=p.base||{};const a=b.vca_eg_a||0,d=b.vca_eg_d||0,s=b.vca_eg_s||0,r=b.vca_eg_r||0;const cut=b.lpf_cut||0,res=b.lpf_reson||0;const mode=b.play_mode||'Poly';const spread=b.spread||0;const detune=b.vco_detune||0;const sub=b.vco_sub_noise||0;const morph=b.vco_morph||0;const mix=b.vco_mix||0;const sync=b.vco_sync||false;const fm=b.vco_fm||0;const lfo1vco=b.lfo_1_vco_amount||0;const lfo1vcf=b.lfo_1_vcf_amount||0;const lfo2morph=b.lfo_2_morph_amount||0;const seq=b.seq||{};const seqTyp=seq.typ||'';const revMix=(b.reverbs||{}).mix||0;const modMix=(b.modulations||{}).mix||0;const delMix=(b.delays||{}).mix||0;const distMix=(b.distortions||{}).mix||0;const distGain=(b.distortions||{}).gain||0;const isMono=mode==='Mono'||mode==='Unison';const isPoly=mode==='Poly';const hasFX=revMix>0.2||modMix>0.2||delMix>0.2;const hasSeq=seqTyp==='Sequencer'&&seq.sequencer&&seq.sequencer.steps&&seq.sequencer.steps.some(st=>st.notes&&st.notes.length>0);const hasArp=seqTyp==='Arpeggiator';const longEnv=a>0.3&&r>0.3;const shortEnv=a<0.1&&d<0.3&&r<0.25;const pluckEnv=a<0.05&&d>0.15&&d<0.7&&s<0.3;const droneEnv=s>0.8&&r>0.5;const heavyLfo=Math.abs(lfo1vco)>0.1||Math.abs(lfo1vcf)>0.15||Math.abs(lfo2morph)>0.1;if(hasSeq)return'Sequence';if(hasArp)return'Arp';if(isMono&&cut<0.2&&shortEnv&&sub>0.1)return'Sub Bass';if(isMono&&shortEnv&&cut<0.4)return'Bass';if(isMono&&distMix>0.2&&distGain>0.2)return'Aggressive Lead';if(isMono&&(sync||fm>0.1))return'Sync Lead';if(isMono&&cut>0.4)return'Lead';if(isMono)return'Mono';if(isPoly&&droneEnv&&revMix>0.3)return'Drone';if(isPoly&&longEnv&&spread>0.3&&(revMix>0.2||modMix>0.2))return'Ambient Pad';if(isPoly&&longEnv&&heavyLfo)return'Evolving Pad';if(isPoly&&longEnv)return'Pad';if(isPoly&&pluckEnv&&!hasFX)return'Pluck';if(isPoly&&pluckEnv)return'Keys';if(isPoly&&shortEnv&&cut>0.5)return'Stab';if(isPoly&&shortEnv)return'Keys';if(isPoly&&heavyLfo)return'Motion';return isPoly?'Poly':'Synth'}
+
+function presetDisplayName(p,bank,idx){const base=p.name||bank+String(idx+1).padStart(2,'0');const cat=classifyPreset(p);return base+' ('+cat+')'}
+
 function parseSyx(buffer){const b=new Uint8Array(buffer),presets=[];let i=0;while(i<b.length){if(b[i]===0xF0){let end=i+1;while(end<b.length&&b[end]!==0xF7)end++;const payload=b.slice(i+6,end),txt=new TextDecoder().decode(payload);if(txt.startsWith('{'))try{presets.push(JSON.parse(txt))}catch(e){}i=end+1}else i++}return presets}
 
 function handleFiles(e){for(const file of e.target.files)loadFile(file)}
@@ -214,10 +251,10 @@ function renderBankTabs(){document.getElementById('bankTabs').innerHTML=BANK_LET
 
 function switchBank(letter){activeBank=letter;activePresetIdx=0;compareSelection=[];filterMode=null;sortCol=null;sortDir=1;renderBankTabs();renderSidebar();renderView()}
 
-async function autoLoadBanks(){for(let i=0;i<BANK_LETTERS.length;i++){const letter=BANK_LETTERS[i],filename=`artemis-bank-${letter.toLowerCase()}.bin`;try{const resp=await fetch(filename);if(!resp.ok)continue;const buffer=await resp.arrayBuffer(),presets=parseSyx(buffer);if(!presets.length)continue;BANKS[letter]=presets.length===65?presets.slice(1):presets.slice(0,64);BANK_SOURCE[letter]='factory';renderBankTabs()}catch(e){}}}
+async function autoLoadBanks(){for(let i=0;i<BANK_LETTERS.length;i++){const letter=BANK_LETTERS[i],filename=`artemis-bank-${letter.toLowerCase()}.bin`;try{const resp=await fetch(filename);if(!resp.ok)continue;const buffer=await resp.arrayBuffer(),presets=parseSyx(buffer);if(!presets.length)continue;BANKS[letter]=presets.length===65?presets.slice(1):presets.slice(0,64);BANK_SOURCE[letter]='factory';renderBankTabs();if(letter===activeBank){renderSidebar();renderView()}}catch(e){}}}
 
 async function loadFactoryBank(){if(!activeBank)return;const filename=`artemis-bank-${activeBank.toLowerCase()}.bin`;try{const resp=await fetch(filename);if(!resp.ok){alert('Factory file not found: '+filename);return}const buffer=await resp.arrayBuffer(),presets=parseSyx(buffer);if(!presets.length){alert('No presets found in '+filename);return}BANKS[activeBank]=presets.length===65?presets.slice(1):presets.slice(0,64);BANK_SOURCE[activeBank]='factory';renderBankTabs();renderSidebar();renderView()}catch(e){alert('Could not load factory file: '+filename)}}
-function renderSidebar(){const list=document.getElementById('presetList');if(!activeBank||!BANKS[activeBank]){list.innerHTML='';return}const presets=BANKS[activeBank],query=document.getElementById('search').value.toLowerCase();list.innerHTML=presets.map((p,i)=>{const b=p.base||{},name=p.name||`${activeBank}${String(i+1).padStart(2,'0')}`,mode=MODES[b.play_mode]||b.play_mode||'?';if(query&&!name.toLowerCase().includes(query)&&!mode.toLowerCase().includes(query))return'';const isActive=i===activePresetIdx,isCompare=compareSelection.includes(i);const bars=[b.lpf_cut||0,b.lpf_reson||0,b.vca_eg_a||0,b.vca_eg_r||0];const miniHtml='<div class="preset-mini-bars">'+bars.map(v=>'<div class="preset-mini-bar" style="height:'+Math.max(2,v*14)+'px;background:'+(v>0.5?'#fff':'#333')+'"></div>').join('')+'</div>';return'<div class="preset-item '+(isActive?'active':'')+' '+(isCompare?'compare-selected':'')+'" onclick="selectPreset('+i+')" oncontextmenu="toggleCompare(event,'+i+')"><div class="preset-num">'+String(i+1).padStart(2,'0')+'</div><div class="preset-label">'+name+'</div>'+miniHtml+'<div class="preset-mode-badge">'+mode+'</div></div>'}).join('')}
+function renderSidebar(){const list=document.getElementById('presetList');if(!activeBank||!BANKS[activeBank]){list.innerHTML='';return}const presets=BANKS[activeBank],query=document.getElementById('search').value.toLowerCase();list.innerHTML=presets.map((p,i)=>{const b=p.base||{},name=presetDisplayName(p,activeBank,i),mode=MODES[b.play_mode]||b.play_mode||'?';if(query&&!name.toLowerCase().includes(query)&&!mode.toLowerCase().includes(query))return'';const isActive=i===activePresetIdx,isCompare=compareSelection.includes(i);const bars=[b.lpf_cut||0,b.lpf_reson||0,b.vca_eg_a||0,b.vca_eg_r||0];const miniHtml='<div class="preset-mini-bars">'+bars.map(v=>'<div class="preset-mini-bar" style="height:'+Math.max(2,v*14)+'px;background:'+(v>0.5?'#fff':'#333')+'"></div>').join('')+'</div>';return'<div class="preset-item '+(isActive?'active':'')+' '+(isCompare?'compare-selected':'')+'" onclick="selectPreset('+i+')" oncontextmenu="toggleCompare(event,'+i+')"><div class="preset-num">'+String(i+1).padStart(2,'0')+'</div><div class="preset-label">'+name+'</div>'+miniHtml+'<div class="preset-mode-badge">'+mode+'</div></div>'}).join('')}
 
 function filterList(){renderSidebar()}
 function selectPreset(i){activePresetIdx=i;renderSidebar();if(currentView==='detail')renderDetail();else if(currentView==='table')document.querySelectorAll('table.data tr').forEach((tr,idx)=>{if(idx>0)tr.classList.toggle('active',idx-1===i)})}
@@ -234,7 +271,7 @@ function midiNote(n){const ns=['C','C#','D','D#','E','F','F#','G','G#','A','A#',
 
 function paramRow(key,val,color){const n=NAMES[key]||key.replace(/_/g,' '),f=fmt(val),isNum=typeof val==='number',cls=typeof val==='string'?'str':(val===true?'on':(isZero(val)?'zero':''));const bar=isNum?'<div class="pr-bar"><div class="pr-fill" style="width:'+pct(val)+'%;background:'+color+'"></div></div>':'';return'<div class="pr"><div class="pr-n">'+n+'</div>'+bar+'<div class="pr-v '+cls+'">'+f+'</div></div>'}
 
-function renderDetail(){const area=document.getElementById('contentArea'),p=BANKS[activeBank][activePresetIdx];if(!p)return;const b=p.base||{},name=p.name||`${activeBank}${String(activePresetIdx+1).padStart(2,'0')}`,mode=MODES[b.play_mode]||b.play_mode||'';
+function renderDetail(){const area=document.getElementById('contentArea'),p=BANKS[activeBank][activePresetIdx];if(!p)return;const b=p.base||{},name=presetDisplayName(p,activeBank,activePresetIdx),mode=MODES[b.play_mode]||b.play_mode||'';
 let html='<div class="detail-header"><div class="detail-title">'+name+'</div><div class="detail-subtitle">'+mode+' · BPM '+(b.bpm||120).toFixed(0)+' · Drive: '+(b.drive_mode||'Off')+' · Right-click presets in sidebar to compare</div></div><div class="detail-grid">';
 for(const s of SECTIONS){let rows='';for(const k of s.k)if(b[k]!==undefined)rows+=paramRow(k,b[k],s.c);const cnt=s.k.filter(k=>b[k]!==undefined).length;html+='<div class="card"><div class="card-head open" onclick="this.classList.toggle(\'open\');this.nextElementSibling.classList.toggle(\'open\')"><div class="card-dot" style="background:'+s.c+'"></div><div class="card-title">'+s.t+'</div><div class="card-count">'+cnt+'</div><div class="card-chevron">▶</div></div><div class="card-body open">'+rows+'</div></div>'}
 for(const fx of FX){const d=b[fx.id];if(!d)continue;let rows=paramRow('typ',d.typ,fx.c)+paramRow('mix',d.mix,fx.c);for(const[k,v]of Object.entries(d)){if(['typ','mix'].includes(k)||typeof v==='object')continue;rows+=paramRow(k,v,fx.c)}const algoKey=ALGO_MAP[d.typ];if(algoKey&&d[algoKey])for(const[k,v]of Object.entries(d[algoKey]))rows+=paramRow(k,v,fx.c);html+='<div class="card"><div class="card-head open" onclick="this.classList.toggle(\'open\');this.nextElementSibling.classList.toggle(\'open\')"><div class="card-dot" style="background:'+fx.c+'"></div><div class="card-title">'+fx.t+'</div><div class="card-chevron">▶</div></div><div class="card-body open">'+rows+'</div></div>'}
@@ -249,7 +286,7 @@ function hasModData(obj){for(const[k,v]of Object.entries(obj)){if(typeof v==='ob
 function renderModGrid(mod){let html='<div class="mod-grid">';for(const[k,v]of Object.entries(mod)){if(typeof v==='object'){for(const[k2,v2]of Object.entries(v)){if(typeof v2!=='number')continue;const has=Math.abs(v2)>0.001,f=v2===0?'0':(v2>0?'+':'')+(v2*100).toFixed(1)+'%';html+='<div class="mg-row '+(has?'has':'')+'"><div class="mg-n">'+(k+'.'+k2).replace(/_/g,' ')+'</div><div class="mg-v">'+f+'</div></div>'}}else if(typeof v==='number'){const has=Math.abs(v)>0.001,f=v===0?'0':(v>0?'+':'')+(v*100).toFixed(1)+'%';html+='<div class="mg-row '+(has?'has':'')+'"><div class="mg-n">'+k.replace(/_/g,' ')+'</div><div class="mg-v">'+f+'</div></div>'}}html+='</div>';return html}
 const TABLE_COLS=[
   {k:'_num',l:'#',fn:(_,i)=>String(i+1).padStart(2,'0')},
-  {k:'_name',l:'Name',fn:(p,i)=>p.name||`${activeBank}${String(i+1).padStart(2,'0')}`},
+  {k:'_name',l:'Name',fn:(p,i)=>presetDisplayName(p,activeBank,i)},
   {k:'play_mode',l:'Mode',fn:p=>(MODES[(p.base||{}).play_mode]||(p.base||{}).play_mode||'')},
   {k:'vco_morph',l:'Wave',fn:p=>(p.base||{}).vco_morph,num:true},
   {k:'vco_pw',l:'PW',fn:p=>(p.base||{}).vco_pw,num:true},
@@ -274,7 +311,35 @@ function renderTable(){const area=document.getElementById('contentArea'),presets
 
 function sortTable(ci){if(sortCol===ci)sortDir*=-1;else{sortCol=ci;sortDir=1}renderTable()}
 
-function renderCompare(){const area=document.getElementById('contentArea');if(compareSelection.length<2){area.innerHTML='<div class="empty-state">'+EMPTY_SVG+'<h3>Compare Presets</h3><p>Right-click 2 or 3 presets in the sidebar to select them for comparison. Differences will be highlighted.</p></div>';return}const ps=compareSelection.map(i=>({idx:i,p:BANKS[activeBank][i]})),cols=ps.length;let html='<div class="compare-grid" style="grid-template-columns:160px repeat('+cols+',1fr)"><div></div>';for(const{idx,p}of ps){const name=p.name||`${activeBank}${String(idx+1).padStart(2,'0')}`;html+='<div class="compare-col-head">'+name+'</div>'}for(const s of SECTIONS){html+='<div class="compare-section-title" style="grid-column:1/-1">'+s.t+'</div>';for(const k of s.k){const vals=ps.map(({p})=>(p.base||{})[k]),allSame=vals.every(v=>fmt(v)===fmt(vals[0]));html+='<div class="cmp-label">'+(NAMES[k]||k)+'</div>';for(const v of vals)html+='<div class="cmp-val '+(!allSame?'diff':'')+'">'+fmt(v)+'</div>'}}for(const fx of FX){html+='<div class="compare-section-title" style="grid-column:1/-1">'+fx.t+'</div>';const types=ps.map(({p})=>((p.base||{})[fx.id]||{}).typ||'—'),typeSame=types.every(t=>t===types[0]);html+='<div class="cmp-label">Algorithm</div>';for(const t of types)html+='<div class="cmp-val '+(!typeSame?'diff':'')+'">'+t+'</div>';const mixes=ps.map(({p})=>((p.base||{})[fx.id]||{}).mix||0),mixSame=mixes.every(m=>fmt(m)===fmt(mixes[0]));html+='<div class="cmp-label">Mix</div>';for(const m of mixes)html+='<div class="cmp-val '+(!mixSame?'diff':'')+'">'+fmt(m)+'</div>'}html+='</div>';area.innerHTML=html}
+function renderCompare(){const area=document.getElementById('contentArea');if(compareSelection.length<2){area.innerHTML='<div class="empty-state">'+EMPTY_SVG+'<h3>Compare Presets</h3><p>Right-click 2 or 3 presets in the sidebar to select them for comparison. Differences will be highlighted.</p></div>';return}const ps=compareSelection.map(i=>({idx:i,p:BANKS[activeBank][i]})),cols=ps.length;let html='<div class="compare-grid" style="grid-template-columns:160px repeat('+cols+',1fr)"><div></div>';for(const{idx,p}of ps){const name=presetDisplayName(p,activeBank,idx);html+='<div class="compare-col-head">'+name+'</div>'}for(const s of SECTIONS){html+='<div class="compare-section-title" style="grid-column:1/-1">'+s.t+'</div>';for(const k of s.k){const vals=ps.map(({p})=>(p.base||{})[k]),allSame=vals.every(v=>fmt(v)===fmt(vals[0]));html+='<div class="cmp-label">'+(NAMES[k]||k)+'</div>';for(const v of vals)html+='<div class="cmp-val '+(!allSame?'diff':'')+'">'+fmt(v)+'</div>'}}for(const fx of FX){html+='<div class="compare-section-title" style="grid-column:1/-1">'+fx.t+'</div>';const types=ps.map(({p})=>((p.base||{})[fx.id]||{}).typ||'—'),typeSame=types.every(t=>t===types[0]);html+='<div class="cmp-label">Algorithm</div>';for(const t of types)html+='<div class="cmp-val '+(!typeSame?'diff':'')+'">'+t+'</div>';const mixes=ps.map(({p})=>((p.base||{})[fx.id]||{}).mix||0),mixSame=mixes.every(m=>fmt(m)===fmt(mixes[0]));html+='<div class="cmp-label">Mix</div>';for(const m of mixes)html+='<div class="cmp-val '+(!mixSame?'diff':'')+'">'+fmt(m)+'</div>'}html+='</div>';area.innerHTML=html}
+
+let midiAccess=null,midiInput=null,midiListening=false,midiBuffer=[],midiTimeout=null;
+
+function toggleMidiPanel(){document.getElementById('midiPanel').classList.toggle('open');if(!midiAccess)initMidi()}
+
+function closeMidiPanel(){document.getElementById('midiPanel').classList.remove('open')}
+
+async function initMidi(){if(!navigator.requestMIDIAccess){setMidiStatus('Web MIDI not supported in this browser. Use Chrome or Edge.');return}try{midiAccess=await navigator.requestMIDIAccess({sysex:true});populateMidiPorts();midiAccess.onstatechange=()=>populateMidiPorts()}catch(e){setMidiStatus('MIDI access denied. Please allow SysEx access when prompted.')}}
+
+function populateMidiPorts(){const sel=document.getElementById('midiPortSelect');const prev=sel.value;sel.innerHTML='<option value="">— Select MIDI Input —</option>';for(const[id,port]of midiAccess.inputs){const opt=document.createElement('option');opt.value=id;opt.textContent=port.name+(port.manufacturer?' ('+port.manufacturer+')':'');sel.appendChild(opt)}if(prev&&sel.querySelector(`option[value="${prev}"]`))sel.value=prev;setMidiStatus(midiAccess.inputs.size===0?'No MIDI devices found. Connect your Artemis via USB and refresh.':'Select your Artemis MIDI input port above.')}
+
+function toggleListen(){if(midiListening){stopListening()}else{startListening()}}
+
+function startListening(){const sel=document.getElementById('midiPortSelect');if(!sel.value){setMidiStatus('Please select a MIDI input port first.');return}if(midiInput)midiInput.onmidimessage=null;midiInput=midiAccess.inputs.get(sel.value);if(!midiInput){setMidiStatus('Port not found. Try refreshing.');return}midiBuffer=[];midiInput.onmidimessage=handleMidiMessage;midiListening=true;document.getElementById('listenBtn').textContent='Stop Listening';document.getElementById('listenBtn').classList.add('active');document.getElementById('midiBtn').classList.add('listening');const slotName=activeBank?activeBank+String((activePresetIdx||0)+1).padStart(2,'0'):'?';setMidiStatus('Listening on '+midiInput.name+'...<br>Trigger a preset or bank export from your Artemis now.<br>Single presets will load into <span class="count">'+slotName+'</span>.')}
+
+function stopListening(){if(midiInput)midiInput.onmidimessage=null;midiListening=false;document.getElementById('listenBtn').textContent='Start Listening';document.getElementById('listenBtn').classList.remove('active');document.getElementById('midiBtn').classList.remove('listening');setMidiStatus('Stopped listening. '+midiBuffer.length+' SysEx message(s) in buffer.')}
+
+function handleMidiMessage(e){const d=e.data;if(d[0]!==0xF0)return;midiBuffer.push(new Uint8Array(d));const count=midiBuffer.length;setMidiStatus('Receiving... <span class="count">'+count+'</span> SysEx message(s)<br>'+(count===1?'Got header — waiting for preset data...':(count<=65?'Receiving presets... '+(count-1)+'/64':'Received '+count+' messages')));if(midiTimeout)clearTimeout(midiTimeout);midiTimeout=setTimeout(()=>processMidiBuffer(),1500)}
+
+function processMidiBuffer(){if(midiBuffer.length===0)return;console.log('MIDI buffer: '+midiBuffer.length+' messages');for(let i=0;i<Math.min(3,midiBuffer.length);i++){const payload=midiBuffer[i].slice(6,midiBuffer[i].length-1);const txt=new TextDecoder().decode(payload);console.log('Message '+i+' payload: '+txt)}let bankLetter=null;let presetMessages=midiBuffer;if(midiBuffer.length>=2){const firstPayload=midiBuffer[0].slice(6,midiBuffer[0].length-1);const firstTxt=new TextDecoder().decode(firstPayload);try{const hdr=JSON.parse(firstTxt);if(hdr.BankBackup!==undefined){const bankNum=parseInt(hdr.BankBackup);if(bankNum>=0&&bankNum<8)bankLetter=BANK_LETTERS[bankNum];presetMessages=midiBuffer.slice(1);console.log('Bank header found: BankBackup='+bankNum+' → Bank '+bankLetter)}else if(typeof hdr==='string'&&hdr==='PresetBackup'){presetMessages=midiBuffer.slice(1);console.log('Single preset header found')}}catch(e){}}const totalLen=presetMessages.reduce((s,m)=>s+m.length,0);const combined=new Uint8Array(totalLen);let off=0;for(const m of presetMessages){combined.set(m,off);off+=m.length}const presets=parseSyx(combined.buffer);if(!presets.length){setMidiStatus('Received '+midiBuffer.length+' SysEx messages but could not parse any presets.');return}if(bankLetter&&presets.length>=64){BANKS[bankLetter]=presets.slice(0,64);BANK_SOURCE[bankLetter]='user';renderBankTabs();switchBank(bankLetter);setMidiStatus('Bank '+bankLetter+' loaded! <span class="count">'+presets.length+'</span> presets received via MIDI.')}else if(presets.length>=64&&!bankLetter){for(const l of BANK_LETTERS)if(!BANKS[l]){bankLetter=l;break};if(!bankLetter)bankLetter='A';BANKS[bankLetter]=presets.slice(0,64);BANK_SOURCE[bankLetter]='user';renderBankTabs();switchBank(bankLetter);setMidiStatus('Bank '+bankLetter+' loaded! <span class="count">'+presets.length+'</span> presets received via MIDI.')}else if(presets.length>=1){const p=presets[0];if(!BANKS[activeBank])BANKS[activeBank]=[];const slot=activePresetIdx||0;BANKS[activeBank][slot]=p;BANK_SOURCE[activeBank]=BANK_SOURCE[activeBank]||'user';renderBankTabs();renderSidebar();renderView();const slotName=activeBank+String(slot+1).padStart(2,'0');setMidiStatus('Preset received → <span class="count">'+slotName+'</span>');setTimeout(()=>{const items=document.querySelectorAll('.preset-item');if(items[slot]){items[slot].classList.add('flash');setTimeout(()=>items[slot].classList.remove('flash'),1000)}},50)}midiBuffer=[]}
+
+function clearMidiBuffer(){midiBuffer=[];setMidiStatus(midiListening?'Buffer cleared. Listening on '+midiInput.name+'...':'Buffer cleared.')}
+
+function setMidiStatus(html){document.getElementById('midiStatus').innerHTML=html}
+
+function buildSyx(presets){const header=[0xF0,0x00,0x21,0x35,0x00,0x09];const enc=new TextEncoder();const msgs=[];const hdrPayload=enc.encode('"PresetBackup"');msgs.push(new Uint8Array([...header,...hdrPayload,0xF7]));for(const p of presets){const json=enc.encode(JSON.stringify(p));msgs.push(new Uint8Array([...header,...json,0xF7]))}let total=0;for(const m of msgs)total+=m.length;const out=new Uint8Array(total);let off=0;for(const m of msgs){out.set(m,off);off+=m.length}return out}
+
+async function downloadAll(){const loadedBanks=BANK_LETTERS.filter(l=>BANKS[l]);if(!loadedBanks.length){alert('No banks loaded to download.');return}const zip=new JSZip();for(const l of loadedBanks){const syx=buildSyx(BANKS[l]);zip.file(`artemis-bank-${l.toLowerCase()}.syx`,syx)}try{const htmlResp=await fetch(window.location.href);if(htmlResp.ok){const htmlText=await htmlResp.text();zip.file('artemis-explorer.html',htmlText)}}catch(e){zip.file('artemis-explorer.html','<!-- Could not include HTML - save it manually from your browser -->')}const blob=await zip.generateAsync({type:'blob'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='artemis-presets.zip';a.click();URL.revokeObjectURL(url)}
 
 renderBankTabs();switchBank('A');autoLoadBanks();
 </script>
