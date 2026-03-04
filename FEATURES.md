@@ -1,0 +1,86 @@
+# Artemis Preset Explorer — Feature Backlog
+
+Status key: ✅ Done · 🔜 Next · 📋 Planned · 🔭 Long-term
+
+---
+
+## ✅ Completed
+
+- Bank browser (A–H tabs, factory/user badges)
+- Preset sidebar with search, mini bars, mode badges, heuristic classification
+- Detail view (collapsible cards: VCO, VCF, envelopes, LFOs, FX, Seq/Arp, global)
+- Modulation matrix (5 sources, non-zero assignments highlighted)
+- Table view (sortable, filterable by play mode)
+- Compare view (right-click 2–3 presets, diffs in orange)
+- Drag-and-drop / file picker `.syx` import
+- Load Factory button (fetches factory `.bin` per bank)
+- Download All (zip of all loaded banks as `.syx`)
+- Web MIDI receive — bank dump (65 messages) and single preset (2 messages)
+- Web MIDI send — Send Preset (audition) and Send Bank (with destination prompt)
+- In-app user guide (? button → modal)
+- GitHub issues link in header
+- TypeScript + Vite + Vitest + GitHub Actions CI/CD
+- Regression test: all HTML onclick handlers verified against window exports
+
+---
+
+## 🔜 Near-term (from handoff / Dreadbox feedback)
+
+### Preset editing
+Inline parameter editing directly in the detail view. Edits mutate the in-memory
+preset JSON; user then sends to Artemis via MIDI or exports via Download All.
+
+- Sliders for float parameters (0.0–1.0 range)
+- Dropdowns for enum parameters (play mode, drive mode, waveform, etc.)
+- Toggles for boolean parameters (legato, sync, etc.)
+- Editable `name` field (text input, replaces current read-only display)
+- Mark preset/bank as "modified" (dirty flag, different badge color)
+
+### Librarian features
+- Rename presets (edit `name` field in sidebar or detail header)
+- Copy/paste preset between slots and banks
+- Reorder presets by drag-and-drop in the sidebar
+
+### Unsaved changes warning
+- Track a dirty flag when any bank has been modified
+- `beforeunload` prompt if dirty: "You have unsaved changes. Download your banks before leaving."
+
+---
+
+## 📋 Medium-term
+
+### Keyboard navigation
+- `↑` / `↓` arrows to move through preset list
+- `Escape` to close open panels (MIDI, help modal)
+- `A`–`H` to switch bank tabs
+
+### Export single preset
+- Button in detail view header (or right-click menu) to download the selected
+  preset as a standalone `.syx` file, useful for sharing individual sounds.
+
+### Patch sharing via URL
+- Compress a single preset's JSON to base64 and store in the URL hash (`#preset=…`)
+- Anyone opening that URL sees the preset loaded automatically
+- Zero backend required
+
+### Cross-bank search
+- Global search across all loaded banks, not just the active one
+- Results show bank letter + slot, clicking navigates there
+
+### Local storage persistence
+- Save loaded banks to `localStorage` on change
+- Restore on page load so reloads don't lose work
+
+### Embedded presets in HTML for offline use
+- "Download Offline Copy" bakes current preset data into a self-contained HTML file
+  that works from `file://` without a server (no fetch for `.bin` files)
+
+---
+
+## 🔭 Long-term
+
+### Patch hub
+- Browsable community preset library
+- Upload, tag, search, download individual presets
+- Needs a backend (Firebase / Supabase / GitHub-backed JSON store)
+- Dreadbox team expressed interest in collaboration here
