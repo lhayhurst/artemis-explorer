@@ -20,8 +20,8 @@ const JS_KEYWORDS = new Set(['if', 'else', 'for', 'while', 'do', 'return', 'new'
 /** Extract all bare function names from onclick="…" and onchange="…" attributes in HTML. */
 function htmlOnHandlers(html: string): string[] {
   const names = new Set<string>();
-  // match onclick="foo(…)" or onchange="foo(…)" – capture every call-site identifier
-  for (const m of html.matchAll(/on(?:click|change)="([^"]+)"/g)) {
+  // match onclick="foo(…)", onchange="foo(…)", oninput="foo(…)" – capture every call-site identifier
+  for (const m of html.matchAll(/on(?:click|change|input)="([^"]+)"/g)) {
     const expr = m[1]!;
     // Only top-level calls: identifier followed by '(' but NOT preceded by '.'
     for (const call of expr.matchAll(/(?<![.\w])([a-zA-Z_$][\w$]*)\s*\(/g)) {

@@ -21,20 +21,24 @@ Status key: ✅ Done · 🔜 Next · 📋 Planned · 🔭 Long-term
 - GitHub issues link in header
 - TypeScript + Vite + Vitest + GitHub Actions CI/CD
 - Regression test: all HTML onclick handlers verified against window exports
+- Preset editing — ✎ Edit / Done toggle in detail view; sliders, dropdowns, toggles, name input; per-preset dirty dot (orange ●) in sidebar; bank tab dirty badge
+- MIDI footer bar — persistent bottom strip replacing floating panel; IN/OUT sections with connectivity dots (red/green); buttons disabled until port selected
+- Sidebar preset names no longer include category suffix (badge already shows it)
 
 ---
 
-## 🔜 Near-term (from handoff / Dreadbox feedback)
+## 🐛 Known Bugs
 
-### Preset editing
-Inline parameter editing directly in the detail view. Edits mutate the in-memory
-preset JSON; user then sends to Artemis via MIDI or exports via Download All.
+### MIDI connectivity dots don't go red on device power-off
+The IN/OUT dots correctly turn green when ports are selected, but do not reliably
+turn red when the Artemis is powered off. Chrome fires `onstatechange` but port
+state in `midiAccess.inputs`/`outputs` maps appears stale at the time of the
+callback even with `setTimeout(0)` deferral. Root cause is a Chrome Web MIDI
+quirk. Workaround: re-select ports manually after reconnecting.
 
-- Sliders for float parameters (0.0–1.0 range)
-- Dropdowns for enum parameters (play mode, drive mode, waveform, etc.)
-- Toggles for boolean parameters (legato, sync, etc.)
-- Editable `name` field (text input, replaces current read-only display)
-- Mark preset/bank as "modified" (dirty flag, different badge color)
+---
+
+## 🔜 Near-term
 
 ### Librarian features
 - Rename presets (edit `name` field in sidebar or detail header)
@@ -42,8 +46,7 @@ preset JSON; user then sends to Artemis via MIDI or exports via Download All.
 - Reorder presets by drag-and-drop in the sidebar
 
 ### Unsaved changes warning
-- Track a dirty flag when any bank has been modified
-- `beforeunload` prompt if dirty: "You have unsaved changes. Download your banks before leaving."
+- `beforeunload` prompt if dirty banks: "You have unsaved changes. Download your banks before leaving."
 
 ---
 

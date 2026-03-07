@@ -22,6 +22,7 @@ let midiListening = false;
 let midiBuffer: Uint8Array[] = [];
 let midiTimeout: ReturnType<typeof setTimeout> | null = null;
 let callbacks: MidiCallbacks | null = null;
+let isSending = false;
 
 export function initMidiCallbacks(cb: MidiCallbacks): void {
   callbacks = cb;
@@ -29,6 +30,29 @@ export function initMidiCallbacks(cb: MidiCallbacks): void {
 
 function setStatus(html: string): void {
   callbacks?.onStatus(html);
+}
+
+export function updateMidiDots(): void {
+  const inSel = document.getElementById('midiPortSelect') as HTMLSelectElement | null;
+  const hasInputPorts = midiAccess !== null && (midiAccess.inputs as unknown as Map<string, MIDIInput>).size > 0;
+  const inPortSelected = hasInputPorts && (inSel?.value ?? '') !== '';
+
+  const inDot = document.getElementById('midiInDot');
+  if (inDot) inDot.classList.toggle('connected', inPortSelected);
+
+  const outDot = document.getElementById('midiOutDot');
+  if (outDot) outDot.classList.toggle('connected', midiOutput !== null);
+
+  for (const id of ['listenBtn', 'clearMidiBtn']) {
+    const btn = document.getElementById(id) as HTMLButtonElement | null;
+    if (btn) btn.disabled = !inPortSelected;
+  }
+
+  const outConnected = midiOutput !== null;
+  for (const id of ['sendPresetBtn', 'sendBankBtn']) {
+    const btn = document.getElementById(id) as HTMLButtonElement | null;
+    if (btn) btn.disabled = !outConnected;
+  }
 }
 
 function delay(ms: number): Promise<void> {
@@ -43,9 +67,30 @@ export async function initMidi(): Promise<void> {
   try {
     midiAccess = await navigator.requestMIDIAccess({ sysex: true });
     populateMidiPorts();
-    midiAccess.onstatechange = () => populateMidiPorts();
+    midiAccess.onstatechange = () => {
+      // Defer so the browser finishes updating port states in the maps —
+      // Chrome fires onstatechange before updating map state.
+      setTimeout(() => {
+        const inputs = midiAccess!.inputs as unknown as Map<string, MIDIInput>;
+        const outputs = midiAccess!.outputs as unknown as Map<string, MIDIOutput>;
+        if (midiInput) {
+          const p = inputs.get(midiInput.id);
+          if (!p || p.state !== 'connected') {
+            midiInput.onmidimessage = null;
+            midiInput = null;
+            midiListening = false;
+          }
+        }
+        if (midiOutput) {
+          const p = outputs.get(midiOutput.id);
+          if (!p || p.state !== 'connected') midiOutput = null;
+        }
+        populateMidiPorts();
+      }, 0);
+    };
   } catch {
     setStatus('MIDI access denied. Please allow SysEx access when prompted.');
+    updateMidiDots();
   }
 }
 
@@ -59,6 +104,7 @@ export function populateMidiPorts(): void {
     inSel.innerHTML = '<option value="">— Select MIDI Input —</option>';
     const inputs = midiAccess.inputs as unknown as Map<string, MIDIInput>;
     inputs.forEach((port, id) => {
+      if (port.state !== 'connected') return;
       const opt = document.createElement('option');
       opt.value = id;
       opt.textContent = port.name + (port.manufacturer ? ` (${port.manufacturer})` : '');
@@ -75,6 +121,7 @@ export function populateMidiPorts(): void {
     outSel.innerHTML = '<option value="">— Select MIDI Output —</option>';
     const outputs = midiAccess.outputs as unknown as Map<string, MIDIOutput>;
     outputs.forEach((port, id) => {
+      if (port.state !== 'connected') return;
       const opt = document.createElement('option');
       opt.value = id;
       opt.textContent = port.name + (port.manufacturer ? ` (${port.manufacturer})` : '');
@@ -82,6 +129,7 @@ export function populateMidiPorts(): void {
     });
     const prevOutOpt = outSel.querySelector<HTMLOptionElement>(`option[value="${prevOut}"]`);
     if (prevOut && prevOutOpt) outSel.value = prevOut;
+    else midiOutput = null; // port disappeared
   }
 
   const inputs = midiAccess.inputs as unknown as Map<string, MIDIInput>;
@@ -90,37 +138,57 @@ export function populateMidiPorts(): void {
       ? 'No MIDI devices found. Connect your Artemis via USB and refresh.'
       : 'Select your Artemis MIDI ports above.'
   );
+
+  updateMidiDots(); // after dropdowns are rebuilt so select values are current
 }
 
 export function selectOutputPort(id: string): void {
   if (!midiAccess) return;
   midiOutput = (midiAccess.outputs as unknown as Map<string, MIDIOutput>).get(id) ?? null;
+  updateMidiDots();
 }
 
 // ---------------------------------------------------------------------------
 // Send to Artemis
 // ---------------------------------------------------------------------------
 
+function clearEchoBuffer(): void {
+  midiBuffer = [];
+  if (midiTimeout) { clearTimeout(midiTimeout); midiTimeout = null; }
+}
+
 export async function sendPreset(preset: ArtemisPreset): Promise<void> {
   if (!midiOutput) { setStatus('Select a MIDI output port first.'); return; }
   const messages = splitSyxMessages(buildSyx([preset]));
   setStatus(`Sending preset... (${messages.length} messages)`);
-  for (const msg of messages) {
-    midiOutput.send(Array.from(msg));
-    await delay(INTER_MESSAGE_DELAY_MS);
+  isSending = true;
+  try {
+    for (const msg of messages) {
+      midiOutput.send(Array.from(msg));
+      await delay(INTER_MESSAGE_DELAY_MS);
+    }
+    setStatus('Preset sent. Artemis is previewing — save from the front panel if you want to keep it.');
+  } finally {
+    isSending = false;
+    clearEchoBuffer();
   }
-  setStatus('Preset sent. Artemis is previewing — save from the front panel if you want to keep it.');
 }
 
 export async function sendBank(bankLetter: BankLetter, presets: ArtemisPreset[]): Promise<void> {
   if (!midiOutput) { setStatus('Select a MIDI output port first.'); return; }
   const messages = splitSyxMessages(buildBankSyx(bankLetter, presets));
-  for (let i = 0; i < messages.length; i++) {
-    setStatus(`Sending bank ${bankLetter}... <span class="count">${i + 1}/${messages.length}</span>`);
-    midiOutput.send(Array.from(messages[i]!));
-    await delay(INTER_MESSAGE_DELAY_MS);
+  isSending = true;
+  try {
+    for (let i = 0; i < messages.length; i++) {
+      setStatus(`Sending bank ${bankLetter}... <span class="count">${i + 1}/${messages.length}</span>`);
+      midiOutput.send(Array.from(messages[i]!));
+      await delay(INTER_MESSAGE_DELAY_MS);
+    }
+    setStatus(`Bank ${bankLetter} sent. Artemis will prompt you to choose a destination slot.`);
+  } finally {
+    isSending = false;
+    clearEchoBuffer();
   }
-  setStatus(`Bank ${bankLetter} sent. Artemis will prompt you to choose a destination slot.`);
 }
 
 // ---------------------------------------------------------------------------
@@ -145,8 +213,7 @@ export function startListening(): void {
 
   const listenBtn = document.getElementById('listenBtn');
   listenBtn?.classList.add('active');
-  if (listenBtn) listenBtn.textContent = 'Stop Listening';
-  document.getElementById('midiBtn')?.classList.add('listening');
+  if (listenBtn) listenBtn.textContent = 'Stop';
 
   const activeBank = callbacks?.getActiveBank();
   const slot = callbacks?.getActivePresetIdx() ?? 0;
@@ -160,13 +227,13 @@ export function stopListening(): void {
   if (midiInput) midiInput.onmidimessage = null;
   midiListening = false;
   const listenBtn = document.getElementById('listenBtn');
-  if (listenBtn) listenBtn.textContent = 'Start Listening';
+  if (listenBtn) listenBtn.textContent = 'Listen';
   listenBtn?.classList.remove('active');
-  document.getElementById('midiBtn')?.classList.remove('listening');
   setStatus(`Stopped listening. ${midiBuffer.length} SysEx message(s) in buffer.`);
 }
 
 function handleMidiMessage(e: MIDIMessageEvent): void {
+  if (isSending) return;
   const d = e.data;
   if (!d || d[0] !== 0xf0) return;
   midiBuffer.push(new Uint8Array(d));

@@ -8,6 +8,9 @@ Always use red-green-refactor for all new logic:
 
 Never implement a function before its test exists.
 
+## Software Design
+- Prefer CUPID properties over rigid SOLID rules: write code that is **Composable** (plays well with others), follows the **Unix philosophy** (does one thing well), is **Predictable** (does what you expect), **Idiomatic** (feels natural in its language/ecosystem), and **Domain-based** (solution domain mirrors the problem domain). See: https://dannorth.net/cupid-for-joyful-coding/
+
 ## Scripts
 - `npm run dev` — Vite dev server with hot reload
 - `npm run build` — production build → dist/
@@ -28,6 +31,7 @@ Browser-API-dependent code (midi.ts, main.ts) is not unit-tested — verify manu
 - `src/main.ts` — UI rendering and app wiring (browser API)
 - `public/` — static assets: artemis-bank-{a-h}.bin factory presets, manual PDF
 - `src/test/` — unit tests for pure functions
+
 
 ## Hosting
 Deployed to GitHub Pages via GitHub Actions on push to main.

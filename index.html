@@ -41,23 +41,24 @@ body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;heig
 .hdr-btn:hover{border-color:var(--text-muted);color:var(--text)}
 .hdr-btn.factory-btn{color:var(--cyan);border-color:rgba(103,232,249,.3)}
 .hdr-btn.factory-btn:hover{border-color:var(--cyan)}
-.hdr-btn.midi-btn{color:var(--green);border-color:rgba(74,222,128,.3)}
-.hdr-btn.midi-btn:hover{border-color:var(--green)}
-.hdr-btn.midi-btn.listening{color:var(--bg);background:var(--green);border-color:var(--green);animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}}
-.midi-panel{display:none;position:fixed;top:var(--header-h);right:20px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:16px;z-index:200;min-width:300px;box-shadow:0 8px 32px rgba(0,0,0,.6)}
-.midi-panel.open{display:block}
-.midi-panel h4{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim);margin-bottom:12px}
-.midi-select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:6px 10px;color:var(--text);font-size:12px;font-family:'Outfit',sans-serif;outline:none;margin-bottom:10px}
-.midi-select:focus{border-color:var(--text-muted)}
-.midi-status{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);margin-top:8px;line-height:1.6}
-.midi-status .count{color:var(--green);font-weight:600}
-.midi-bar{display:flex;gap:6px;margin-top:10px}
-.midi-bar button{font-family:'JetBrains Mono',monospace;font-size:9px;padding:6px 12px;border-radius:4px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;transition:all .15s}
-.midi-bar button:hover{border-color:var(--text-muted);color:var(--text)}
-.midi-bar button.listen-btn{color:var(--green);border-color:rgba(74,222,128,.3)}
-.midi-bar button.listen-btn:hover{border-color:var(--green)}
-.midi-bar button.listen-btn.active{background:var(--green);color:var(--bg);border-color:var(--green)}
+.midi-footer{position:fixed;bottom:0;left:0;right:0;height:44px;background:var(--surface);border-top:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:0;z-index:100;flex-shrink:0}
+.midi-dot{width:8px;height:8px;border-radius:50%;background:#ef4444;box-shadow:0 0 5px 1px rgba(239,68,68,.7);flex-shrink:0;margin-right:12px;transition:background .4s,box-shadow .4s}
+.midi-dot.connected{background:#4ade80;box-shadow:0 0 5px 1px rgba(74,222,128,.7)}
+.mf-section{display:flex;align-items:center;gap:6px}
+.mf-sep{width:1px;height:26px;background:var(--border);margin:0 16px;flex-shrink:0}
+.mf-label{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;white-space:nowrap}
+.mf-label.in{color:#60a5fa}
+.mf-label.out{color:#60a5fa}
+.mf-select{background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:4px 8px;color:var(--text);font-size:11px;font-family:'Outfit',sans-serif;outline:none;max-width:180px}
+.mf-select:focus{border-color:var(--text-muted)}
+.mf-btn{font-family:'JetBrains Mono',monospace;font-size:9px;padding:5px 10px;border-radius:3px;cursor:pointer;border:1px solid #555;background:transparent;color:var(--text);text-transform:uppercase;letter-spacing:.5px;transition:all .12s;white-space:nowrap}
+.mf-btn:hover:not(:disabled){border-color:#aaa;color:#fff}
+.mf-btn:disabled{opacity:.2;cursor:not-allowed}
+.mf-btn.listen-btn:hover:not(:disabled){color:var(--green);border-color:rgba(74,222,128,.5)}
+.mf-btn.listen-btn.active{background:var(--green);color:var(--bg);border-color:var(--green);animation:pulse 2s infinite}
+.mf-status{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.mf-status .count{color:var(--green);font-weight:600}
 .credit{font-size:10px;color:var(--text-muted);text-decoration:none;transition:color .15s;border-left:1px solid var(--border);padding-left:14px;margin-left:4px;white-space:nowrap}
 .credit:hover{color:var(--text-dim)}
 .help-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;overflow-y:auto;padding:40px 20px}
@@ -92,10 +93,11 @@ body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;heig
 .preset-item.active .preset-num{color:var(--text)}
 .preset-label{font-size:12px;color:var(--text-dim);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:400}
 .preset-item.active .preset-label{color:var(--text);font-weight:500}
+.preset-dirty{color:#f80;font-size:8px;margin-left:5px;vertical-align:middle}
 .preset-mode-badge{font-family:'JetBrains Mono',monospace;font-size:8px;padding:2px 5px;background:var(--surface-3);border-radius:3px;color:var(--text-muted);letter-spacing:.5px;text-transform:uppercase;border:1px solid var(--border)}
 .preset-mini-bars{display:flex;gap:1px;align-items:flex-end;height:14px}
 .preset-mini-bar{width:3px;border-radius:1px}
-.content-area{flex:1;overflow-y:auto;padding:24px 28px}
+.content-area{flex:1;overflow-y:auto;padding:24px 28px 68px}
 .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-muted);text-align:center;gap:16px}
 .empty-state svg{opacity:.15}
 .empty-state h3{font-size:15px;font-weight:500;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase}
@@ -161,6 +163,18 @@ table.data tr.active td{color:var(--text)}
 .cmp-val{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:500;color:var(--text-dim)}
 .cmp-val.diff{color:var(--orange)}
 #fileInput{display:none}
+.src-badge.dirty{background:rgba(253,186,116,.2);color:var(--orange)}
+.detail-header-row{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.edit-btn{background:none;border:1px solid var(--border-hi);color:var(--text-muted);padding:3px 10px;border-radius:3px;cursor:pointer;font-size:11px;font-family:'JetBrains Mono',monospace;white-space:nowrap;transition:all .15s}
+.edit-btn:hover{border-color:var(--text-muted);color:var(--text)}
+.edit-btn.active{border-color:var(--c-vco);color:var(--c-vco)}
+.detail-name-input{background:var(--surface-2);border:1px solid var(--border-hi);color:var(--text);padding:2px 8px;font-size:18px;font-weight:600;font-family:'Outfit',sans-serif;flex:1;border-radius:3px;letter-spacing:1px;outline:none}
+.detail-name-input:focus{border-color:var(--text-muted)}
+.param-slider{flex:1;height:4px;accent-color:var(--c-vco);cursor:pointer;min-width:80px}
+.param-select{background:var(--surface-2);border:1px solid var(--border-hi);color:var(--text);padding:2px 6px;font-size:11px;font-family:'JetBrains Mono',monospace;border-radius:3px;cursor:pointer}
+.param-num{background:var(--surface-2);border:1px solid var(--border-hi);color:var(--text);padding:2px 6px;font-size:11px;font-family:'JetBrains Mono',monospace;width:64px;border-radius:3px}
+.toggle-btn{background:var(--surface-2);border:1px solid var(--border-hi);color:var(--text-muted);padding:2px 12px;cursor:pointer;font-size:11px;font-family:'JetBrains Mono',monospace;border-radius:3px;transition:all .12s}
+.toggle-btn.on{border-color:var(--green);color:var(--green)}
 @media(max-width:900px){.sidebar{width:200px}.detail-grid{grid-template-columns:1fr}.credit{display:none}}
 </style>
 </head>
@@ -198,29 +212,32 @@ table.data tr.active td{color:var(--text)}
   <button class="hdr-btn" onclick="document.getElementById('fileInput').click()">Load .syx</button>
   <button class="hdr-btn factory-btn" onclick="loadFactoryBank()">Load Factory</button>
   <button class="hdr-btn" onclick="downloadAll()">Download All</button>
-  <button class="hdr-btn midi-btn" id="midiBtn" onclick="toggleMidiPanel()">MIDI</button>
   <button class="hdr-btn" onclick="toggleHelpModal()" title="User Guide">?</button>
   <a class="credit" href="https://dreadbox-fx.com/artemis/" target="_blank" rel="noopener">dreadbox-fx.com</a>
   <a href="https://github.com/lhayhurst/artemis-explorer/issues" target="_blank" rel="noopener" title="Report an issue / request a feature" style="display:flex;align-items:center;color:var(--text-muted);transition:color .15s;margin-left:10px" onmouseenter="this.style.color='var(--text)'" onmouseleave="this.style.color='var(--text-muted)'"><svg height="18" width="18" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a>
   <input type="file" id="fileInput" accept=".syx,.SYX" multiple onchange="handleFiles(event)">
+  <!-- anchors so window-exports test catches edit-mode handlers (rendered dynamically in main.ts) -->
+  <span style="display:none" onclick="toggleEditMode()" onchange="setParam('k','v')" oninput="setPresetName('v')"></span>
 </div>
 
-<div class="midi-panel" id="midiPanel">
-  <h4>MIDI Connection</h4>
-  <div style="font-size:9px;font-family:'JetBrains Mono',monospace;letter-spacing:1px;color:var(--text-muted);margin-bottom:4px">INPUT</div>
-  <select class="midi-select" id="midiPortSelect"><option value="">— Select MIDI Input —</option></select>
-  <div class="midi-bar">
-    <button class="listen-btn" id="listenBtn" onclick="toggleListen()">Start Listening</button>
-    <button onclick="clearMidiBuffer()">Clear Buffer</button>
+<div class="midi-footer">
+  <div class="mf-section">
+    <span class="midi-dot" id="midiInDot"></span>
+    <span class="mf-label in">IN</span>
+    <select class="mf-select" id="midiPortSelect" onchange="updateMidiDots()"><option value="">— Select Input —</option></select>
+    <button class="mf-btn listen-btn" id="listenBtn" onclick="toggleListen()" disabled>Listen</button>
+    <button class="mf-btn" id="clearMidiBtn" onclick="clearMidiBuffer()" disabled>Clear</button>
   </div>
-  <div style="font-size:9px;font-family:'JetBrains Mono',monospace;letter-spacing:1px;color:var(--text-muted);margin-top:12px;margin-bottom:4px">OUTPUT</div>
-  <select class="midi-select" id="midiOutputSelect" onchange="selectOutputPort(this.value)"><option value="">— Select MIDI Output —</option></select>
-  <div class="midi-bar">
-    <button onclick="sendCurrentPreset()">Send Preset</button>
-    <button onclick="sendCurrentBank()">Send Bank</button>
+  <div class="mf-sep"></div>
+  <div class="mf-section">
+    <span class="midi-dot" id="midiOutDot"></span>
+    <span class="mf-label out">OUT</span>
+    <select class="mf-select" id="midiOutputSelect" onchange="selectOutputPort(this.value)"><option value="">— Select Output —</option></select>
+    <button class="mf-btn" id="sendPresetBtn" onclick="sendCurrentPreset()" disabled>Send Preset</button>
+    <button class="mf-btn" id="sendBankBtn" onclick="sendCurrentBank()" disabled>Send Bank</button>
   </div>
-  <div class="midi-status" id="midiStatus">Not connected. Select MIDI ports above.</div>
-  <div class="midi-bar" style="margin-top:12px"><button onclick="closeMidiPanel()">Close</button></div>
+  <div class="mf-sep"></div>
+  <div class="mf-status" id="midiStatus">Initializing MIDI…</div>
 </div>
 <div class="help-overlay" id="helpOverlay" onclick="if(event.target===this)closeHelpModal()">
 <div class="help-modal">
@@ -233,6 +250,7 @@ table.data tr.active td{color:var(--text)}
     <tr><td>Green dot</td><td>Bank is loaded</td></tr>
     <tr><td>Cyan <strong>F</strong> badge</td><td>Factory preset bank</td></tr>
     <tr><td>Green <strong>U</strong> badge</td><td>User-loaded bank</td></tr>
+    <tr><td>Orange <strong>●</strong> badge</td><td>Bank has unsaved edits</td></tr>
   </table>
 
   <h3>Loading Presets</h3>
@@ -248,11 +266,13 @@ table.data tr.active td{color:var(--text)}
     <li><strong>Left-click</strong> a preset to select it and open its detail view.</li>
     <li><strong>Right-click</strong> a preset to add it to the compare selection (up to 3).</li>
     <li>Mini bars show cutoff, resonance, attack, and release at a glance.</li>
+    <li>An orange <strong>●</strong> after a preset name means it has been edited but not yet sent or exported.</li>
   </ul>
 
   <h3>Detail View</h3>
   <p>Shows all parameters for the selected preset in collapsible cards: VCO, VCF (LP/HP), Envelopes, LFOs, FX (Distortion, Modulation, Delay, Reverb), Seq/Arp, and Global. Click a card header to collapse or expand it.</p>
   <p><strong>Modulation Matrix</strong> — tabs below the cards show per-source routing (Mod Wheel, Velocity, Aftertouch, CC74, Key Track). An orange dot means that source has active routing.</p>
+  <p><strong>✎ Edit / Done</strong> — click Edit to enter edit mode. Float parameters become sliders, enums become dropdowns, booleans become toggle buttons, and the preset name becomes a text field. Click Done to return to read-only view. Edits are in-memory only until you send or export.</p>
 
   <h3>Table View</h3>
   <p>All 64 presets in a sortable table. Click a column header to sort; click again to reverse. Use the mode filter chips to narrow the list.</p>
@@ -260,28 +280,18 @@ table.data tr.active td{color:var(--text)}
   <h3>Compare View</h3>
   <p>Right-click 2 or 3 presets in the sidebar, then switch to Compare. Parameters that differ between presets are highlighted in orange.</p>
 
-  <h3>MIDI — Receive from Artemis</h3>
-  <p class="help-note">Requires Chrome or Edge with SysEx access granted.</p>
-  <ol style="font-size:13px;color:var(--text-dim);line-height:1.75;margin:0 0 10px 18px">
-    <li>Open the MIDI panel and select your Artemis from the <strong>INPUT</strong> dropdown.</li>
-    <li>Click <strong>Start Listening</strong>.</li>
-    <li>Trigger a preset or bank export from the Artemis front panel.</li>
-    <li>The app loads the data automatically after a brief pause.</li>
-  </ol>
-  <p><strong>Single preset</strong> — loads into the currently selected bank slot (shown in the status line). The slot flashes green when received.</p>
-  <p><strong>Bank dump</strong> — all 64 presets load into the identified bank, or the first free bank if unidentified.</p>
-
-  <h3>MIDI — Send to Artemis</h3>
-  <ol style="font-size:13px;color:var(--text-dim);line-height:1.75;margin:0 0 10px 18px">
-    <li>Select your Artemis from the <strong>OUTPUT</strong> dropdown in the MIDI panel.</li>
-    <li>Select the preset or bank you want to send in the sidebar.</li>
-    <li>Click <strong>Send Preset</strong> or <strong>Send Bank</strong>.</li>
-  </ol>
+  <h3>MIDI Bar</h3>
+  <p class="help-note">Requires Chrome or Edge with SysEx access granted. The MIDI bar is the strip fixed to the bottom of the window.</p>
+  <p><strong>IN side</strong> — select your Artemis input port, then click <strong>Listen</strong>. Trigger a preset or bank export from the Artemis front panel; the app loads the data automatically. Click <strong>Stop</strong> to stop listening, or <strong>Clear</strong> to discard buffered data.</p>
+  <p><strong>Single preset received</strong> — loads into the currently selected bank slot. An orange ● appears next to the slot if it already had edits; receiving clears it.</p>
+  <p><strong>Bank dump received</strong> — all 64 presets load into the identified bank, or the first free bank if unidentified.</p>
+  <p><strong>OUT side</strong> — select your Artemis output port, then use <strong>Send Preset</strong> or <strong>Send Bank</strong>.</p>
   <p><strong>Send Preset</strong> — loads the preset into Artemis temp memory for audition. Save from the front panel if you want to keep it.</p>
   <p><strong>Send Bank</strong> — sends all 64 presets. The Artemis prompts you to choose a destination bank slot.</p>
+  <p>The coloured dot next to each section label turns green when a port is selected and connected.</p>
 
   <h3>Export</h3>
-  <p><strong>Download All</strong> exports every loaded bank as a <code>.zip</code> containing one <code>.syx</code> file per bank.</p>
+  <p><strong>Download All</strong> exports every loaded bank as a <code>.zip</code> containing one <code>.syx</code> file per bank, including any in-memory edits.</p>
 </div>
 </div>
 

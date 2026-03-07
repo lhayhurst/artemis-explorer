@@ -75,7 +75,5 @@ export function classifyPreset(p: ArtemisPreset): string {
 }
 
 export function presetDisplayName(p: ArtemisPreset, bank: string, idx: number): string {
-  const base = p.name ?? (bank + String(idx + 1).padStart(2, '0'));
-  const cat = classifyPreset(p);
-  return `${base} (${cat})`;
+  return p.name ?? (bank + String(idx + 1).padStart(2, '0'));
 }

@@ -3,7 +3,7 @@ import { classifyPreset, presetDisplayName } from './classifier';
 import { buildSyx } from './sysex-builder';
 import {
   initMidi, initMidiCallbacks, toggleListen, clearMidiBuffer,
-  populateMidiPorts, isListening, selectOutputPort, sendPreset, sendBank,
+  populateMidiPorts, isListening, selectOutputPort, sendPreset, sendBank, updateMidiDots,
 } from './midi';
 import type { ArtemisPreset, BankLetter, BankSource, ViewName, ModSource } from './types';
 // JSZip is loaded from CDN via index.html script tag
@@ -24,6 +24,13 @@ let sortCol: number | null = null;
 let sortDir = 1;
 let filterMode: string | null = null;
 let activeModTab: ModSource = 'mod_wheel';
+let editMode = false;
+const DIRTY_BANKS = new Set<BankLetter>();
+const DIRTY_PRESETS = new Set<string>(); // keys: "A:3"
+function clearDirtyBank(letter: BankLetter): void {
+  DIRTY_BANKS.delete(letter);
+  for (const k of DIRTY_PRESETS) { if (k.startsWith(`${letter}:`)) DIRTY_PRESETS.delete(k); }
+}
 
 // ---------------------------------------------------------------------------
 // Constants / lookup tables
@@ -86,6 +93,33 @@ const MOD_LABELS: Record<ModSource, string> = {
   mod_wheel: 'Mod Wheel', velocity: 'Velocity', aftertouch: 'Aftertouch', cc_74: 'CC74', key_track: 'Key Track',
 };
 
+const BOOLEAN_PARAMS = new Set([
+  'vco_sync', 'lpf_poles', 'lpf_ffm_noise_source', 'legato',
+]);
+const ENUM_PARAMS = new Set([
+  'play_mode', 'drive_mode', 'lfo_1_wave', 'lfo_1_vco_target',
+  'lfo_2_wave', 'lfo_2_sync_mode',
+]);
+const KNOWN_ENUM_VALUES: Record<string, string[]> = {
+  play_mode: ['Poly', 'Mono', 'Unison', '_3x2', '_2x3'],
+};
+
+function getEnumOptions(key: string): string[] {
+  if (KNOWN_ENUM_VALUES[key]) return KNOWN_ENUM_VALUES[key]!;
+  const seen = new Set<string>();
+  for (const l of BANK_LETTERS) {
+    for (const p of BANKS[l] ?? []) {
+      const v = (p.base as Record<string, unknown> | undefined)?.[key];
+      if (typeof v === 'string') seen.add(v);
+    }
+  }
+  return [...seen].sort();
+}
+
+function escHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+}
+
 const EMPTY_SVG = '<svg width="80" height="80" viewBox="0 0 80 80" fill="none"><path d="M40 8L12 68h56L40 8z" stroke="#fff" stroke-width="1" fill="none"/><circle cx="40" cy="32" r="2" fill="#fff"/><circle cx="30" cy="52" r="1.5" fill="#fff"/><circle cx="50" cy="52" r="1.5" fill="#fff"/><line x1="40" y1="32" x2="30" y2="52" stroke="#fff" stroke-width=".5"/><line x1="40" y1="32" x2="50" y2="52" stroke="#fff" stroke-width=".5"/><line x1="30" y1="52" x2="50" y2="52" stroke="#fff" stroke-width=".5"/></svg>';
 
 // ---------------------------------------------------------------------------
@@ -136,6 +170,25 @@ function midiNote(n: number): string {
 
 function paramRow(key: string, val: unknown, color: string): string {
   const name = NAMES[key] ?? key.replace(/_/g, ' ');
+  if (editMode) {
+    let control: string;
+    if (BOOLEAN_PARAMS.has(key)) {
+      const bval = !!val;
+      control = `<button class="toggle-btn${bval ? ' on' : ''}" onclick="setParam('${key}','${!bval}')">${bval ? 'ON' : 'OFF'}</button>`;
+    } else if (ENUM_PARAMS.has(key)) {
+      const opts = getEnumOptions(key)
+        .map(o => `<option value="${escHtml(o)}"${o === val ? ' selected' : ''}>${escHtml(o)}</option>`)
+        .join('');
+      control = `<select class="param-select" onchange="setParam('${key}',this.value)">${opts}</select>`;
+    } else if (key === 'bpm') {
+      control = `<input type="number" class="param-num" min="60" max="300" step="1" value="${Math.round(Number(val ?? 120))}" oninput="setParam('${key}',this.value)">`;
+    } else if (key === 'vco_2_tune') {
+      control = `<input type="number" class="param-num" min="-24" max="24" step="1" value="${Math.round(Number(val ?? 0))}" oninput="setParam('${key}',this.value)">`;
+    } else {
+      control = `<input type="range" class="param-slider" min="0" max="1" step="0.001" value="${Number(val ?? 0).toFixed(3)}" oninput="setParam('${key}',this.value)">`;
+    }
+    return `<div class="pr"><div class="pr-n">${name}</div>${control}<div class="pr-v" id="pv-${key}">${fmt(val)}</div></div>`;
+  }
   const f = fmt(val);
   const isNum = typeof val === 'number';
   const cls = typeof val === 'string' ? 'str' : (val === true ? 'on' : (isZero(val) ? 'zero' : ''));
@@ -151,7 +204,11 @@ function renderBankTabs(): void {
   if (!el) return;
   el.innerHTML = BANK_LETTERS.map(l => {
     const loaded = !!BANKS[l], src = BANK_SOURCE[l];
-    const badge = src ? `<span class="src-badge ${src}">${src === 'factory' ? 'F' : 'U'}</span>` : '';
+    const isDirty = DIRTY_BANKS.has(l);
+    const badge = isDirty
+      ? `<span class="src-badge dirty">●</span>`
+      : src ? `<span class="src-badge ${src}">${src === 'factory' ? 'F' : 'U'}</span>`
+      : '';
     return `<div class="bank-tab ${l === activeBank ? 'active' : ''} ${loaded ? 'loaded' : ''} ${src ?? ''}" onclick="switchBank('${l}')">${l}${badge}</div>`;
   }).join('');
 }
@@ -160,6 +217,7 @@ function renderBankTabs(): void {
 // Bank / preset switching
 // ---------------------------------------------------------------------------
 function switchBank(letter: BankLetter): void {
+  editMode = false;
   activeBank = letter;
   activePresetIdx = 0;
   compareSelection = [];
@@ -187,17 +245,20 @@ function renderSidebar(): void {
     if (query && !name.toLowerCase().includes(query) && !mode.toLowerCase().includes(query)) return '';
     const isActive = i === activePresetIdx;
     const isCompare = compareSelection.includes(i);
+    const isDirtyPreset = DIRTY_PRESETS.has(`${activeBank}:${i}`);
     const bars = [b.lpf_cut ?? 0, b.lpf_reson ?? 0, b.vca_eg_a ?? 0, b.vca_eg_r ?? 0];
     const miniHtml = '<div class="preset-mini-bars">' +
       bars.map(v => `<div class="preset-mini-bar" style="height:${Math.max(2, v * 14)}px;background:${v > 0.5 ? '#fff' : '#333'}"></div>`).join('') +
       '</div>';
-    return `<div class="preset-item ${isActive ? 'active' : ''} ${isCompare ? 'compare-selected' : ''}" onclick="selectPreset(${i})" oncontextmenu="toggleCompare(event,${i})"><div class="preset-num">${String(i + 1).padStart(2, '0')}</div><div class="preset-label">${name}</div>${miniHtml}<div class="preset-mode-badge">${mode}</div></div>`;
+    const dirtyDot = isDirtyPreset ? '<span class="preset-dirty">●</span>' : '';
+    return `<div class="preset-item ${isActive ? 'active' : ''} ${isCompare ? 'compare-selected' : ''}" onclick="selectPreset(${i})" oncontextmenu="toggleCompare(event,${i})"><div class="preset-num">${String(i + 1).padStart(2, '0')}</div><div class="preset-label">${name}${dirtyDot}</div>${miniHtml}<div class="preset-mode-badge">${mode}</div></div>`;
   }).join('');
 }
 
 function filterList(): void { renderSidebar(); }
 
 function selectPreset(i: number): void {
+  editMode = false;
   activePresetIdx = i;
   renderSidebar();
   if (currentView === 'detail') renderDetail();
@@ -250,7 +311,11 @@ function renderDetail(): void {
   const name = presetDisplayName(p, activeBank, activePresetIdx);
   const mode = MODES[b.play_mode ?? ''] ?? b.play_mode ?? '';
 
-  let html = `<div class="detail-header"><div class="detail-title">${name}</div><div class="detail-subtitle">${mode} · BPM ${(b.bpm ?? 120).toFixed(0)} · Drive: ${b.drive_mode ?? 'Off'} · Right-click presets in sidebar to compare</div></div><div class="detail-grid">`;
+  const editBtn = `<button class="edit-btn${editMode ? ' active' : ''}" onclick="toggleEditMode()">${editMode ? 'Done' : '✎ Edit'}</button>`;
+  const titleHtml = editMode
+    ? `<input class="detail-name-input" type="text" value="${escHtml(p.name ?? '')}" placeholder="Preset name" oninput="setPresetName(this.value)">`
+    : `<div class="detail-title">${name}</div>`;
+  let html = `<div class="detail-header"><div class="detail-header-row">${titleHtml}${editBtn}</div><div class="detail-subtitle" id="detailSubtitle">${mode} · BPM ${(b.bpm ?? 120).toFixed(0)} · Drive: ${b.drive_mode ?? 'Off'} · Right-click presets in sidebar to compare</div></div><div class="detail-grid">`;
 
   for (const s of SECTIONS) {
     let rows = '';
@@ -482,6 +547,7 @@ function loadFile(file: File): void {
 
     BANKS[letter] = presets.length === 65 ? presets.slice(1) : presets.slice(0, 64);
     BANK_SOURCE[letter] = 'user';
+    clearDirtyBank(letter);
     renderBankTabs();
     switchBank(letter);
   };
@@ -516,6 +582,7 @@ async function loadFactoryBank(): Promise<void> {
     if (!presets.length) { alert(`No presets found in ${filename}`); return; }
     BANKS[activeBank] = presets.length === 65 ? presets.slice(1) : presets.slice(0, 64);
     BANK_SOURCE[activeBank] = 'factory';
+    clearDirtyBank(activeBank);
     renderBankTabs();
     renderSidebar();
     renderView();
@@ -542,17 +609,45 @@ async function downloadAll(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// MIDI panel
+// Preset editing
 // ---------------------------------------------------------------------------
-function toggleMidiPanel(): void {
-  const panel = document.getElementById('midiPanel');
-  panel?.classList.toggle('open');
-  if (!panel?.classList.contains('open')) return;
-  initMidi();
+function toggleEditMode(): void {
+  editMode = !editMode;
+  renderDetail();
 }
 
-function closeMidiPanel(): void {
-  document.getElementById('midiPanel')?.classList.remove('open');
+function setParam(key: string, raw: string): void {
+  const p = activeBank ? BANKS[activeBank]?.[activePresetIdx] : undefined;
+  if (!p) return;
+  if (!p.base) p.base = {};
+  const b = p.base as Record<string, unknown>;
+
+  if (BOOLEAN_PARAMS.has(key))   b[key] = (raw === 'true');
+  else if (ENUM_PARAMS.has(key)) b[key] = raw;
+  else                           b[key] = parseFloat(raw);
+
+  if (activeBank) { DIRTY_BANKS.add(activeBank); DIRTY_PRESETS.add(`${activeBank}:${activePresetIdx}`); }
+  renderBankTabs();
+
+  // Patch subtitle in-place (mode/BPM/Drive may have changed)
+  const base = p.base;
+  const mode = MODES[base.play_mode ?? ''] ?? base.play_mode ?? '';
+  const sub = document.getElementById('detailSubtitle');
+  if (sub) sub.textContent =
+    `${mode} · BPM ${(base.bpm ?? 120).toFixed(0)} · Drive: ${base.drive_mode ?? 'Off'} · Right-click presets in sidebar to compare`;
+
+  // Patch value label in-place (avoids full re-render so slider keeps focus)
+  const valEl = document.getElementById(`pv-${key}`);
+  if (valEl) valEl.textContent = fmt(b[key]);
+}
+
+function setPresetName(value: string): void {
+  const p = activeBank ? BANKS[activeBank]?.[activePresetIdx] : undefined;
+  if (!p) return;
+  p.name = value || null;
+  if (activeBank) { DIRTY_BANKS.add(activeBank); DIRTY_PRESETS.add(`${activeBank}:${activePresetIdx}`); }
+  renderBankTabs();
+  renderSidebar();
 }
 
 function toggleHelpModal(): void {
@@ -589,11 +684,13 @@ declare global { interface Window { [key: string]: unknown } }
 Object.assign(window, {
   switchBank, switchView, selectPreset, toggleCompare, filterList,
   sortTable, setFilter,
-  toggleMidiPanel, closeMidiPanel, toggleHelpModal, closeHelpModal,
+  toggleHelpModal, closeHelpModal,
   toggleListen, clearMidiBuffer,
   selectOutputPort, sendCurrentPreset, sendCurrentBank,
   loadFactoryBank, downloadAll, handleFiles,
   setModTab,
+  toggleEditMode, setParam, setPresetName,
+  updateMidiDots,
 });
 
 // ---------------------------------------------------------------------------
@@ -603,12 +700,14 @@ initMidiCallbacks({
   onBankLoaded(letter, presets) {
     BANKS[letter] = presets;
     BANK_SOURCE[letter] = 'user';
+    clearDirtyBank(letter);
     renderBankTabs();
     switchBank(letter);
   },
   onPresetLoaded(letter, slot, preset) {
     if (!BANKS[letter]) BANKS[letter] = [];
     BANKS[letter]![slot] = preset;
+    DIRTY_PRESETS.delete(`${letter}:${slot}`);
     BANK_SOURCE[letter] = BANK_SOURCE[letter] ?? 'user';
     renderBankTabs();
     renderSidebar();
@@ -637,3 +736,4 @@ initMidiCallbacks({
 renderBankTabs();
 switchBank('A');
 autoLoadBanks();
+initMidi();

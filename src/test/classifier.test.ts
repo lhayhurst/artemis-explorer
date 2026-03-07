@@ -183,25 +183,22 @@ describe('classifyPreset', () => {
 describe('presetDisplayName', () => {
   it('uses preset name when present', () => {
     const p: ArtemisPreset = { name: 'Deep Bass', base: { play_mode: 'Mono', lpf_cut: 0.3 } };
-    const result = presetDisplayName(p, 'A', 0);
-    expect(result).toBe('Deep Bass (Bass)');
+    expect(presetDisplayName(p, 'A', 0)).toBe('Deep Bass');
   });
 
   it('falls back to bank+index when name is null', () => {
     const p: ArtemisPreset = { name: null, base: { play_mode: 'Poly' } };
-    const result = presetDisplayName(p, 'B', 4);
-    expect(result).toMatch(/^B05 /);
+    expect(presetDisplayName(p, 'B', 4)).toBe('B05');
   });
 
   it('falls back to bank+index when name is missing', () => {
     const p: ArtemisPreset = { base: { play_mode: 'Poly' } };
-    const result = presetDisplayName(p, 'C', 11);
-    expect(result).toMatch(/^C12 /);
+    expect(presetDisplayName(p, 'C', 11)).toBe('C12');
   });
 
   it('pads index to 2 digits', () => {
     const p: ArtemisPreset = { base: { play_mode: 'Poly' } };
-    expect(presetDisplayName(p, 'A', 0)).toMatch(/A01/);
-    expect(presetDisplayName(p, 'A', 9)).toMatch(/A10/);
+    expect(presetDisplayName(p, 'A', 0)).toBe('A01');
+    expect(presetDisplayName(p, 'A', 9)).toBe('A10');
   });
 });
